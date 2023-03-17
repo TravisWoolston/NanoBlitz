@@ -33,7 +33,7 @@ public class Weapon : MonoBehaviour
         // Object.Destroy(this.gameObject, 1);
     }
 
-    public void FireMissile()
+    public void FireMissile(PlayerController playerC)
     {
         GameObject missile = ObjectPool.SharedInstance.GetMissile();
         if (missile != null)
@@ -41,7 +41,7 @@ public class Weapon : MonoBehaviour
             missile.transform.position = firePoint.position;
             missile.transform.rotation = transform.rotation;
 
-            // missile.GetComponent<Missile>().SetTarget(fireTarget);
+            missile.GetComponent<Missile>().SetPlayerTarget(playerC);
 
             missile.SetActive(true);
             missile.GetComponent<Rigidbody2D>().velocity += (Vector2)(firePoint.up * 100);

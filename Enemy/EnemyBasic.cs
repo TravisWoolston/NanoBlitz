@@ -84,7 +84,9 @@ public class EnemyBasic : MonoBehaviour
     Dissolve Dissolve;
     Transform rbTransform;
     float allySearchRadius = 10;
-
+    public GameObject rallyCpt;
+    Transform cptTransform;
+    Vector2 velocity;
     void Start()
     {
         uM = UM.Instance;
@@ -375,6 +377,15 @@ public class EnemyBasic : MonoBehaviour
             target = closestPlayerAlly.position;
             fireTarget = positionWithMostAllies; // Set fireTarget to position with most allies
         }
+        Vector2 fireDirection = fireTarget - rb.position;
+        fireDirection.Normalize();
+                float dot = Vector3.Dot(transform.up, fireDirection.normalized);
+        if (timer > fireRate && dot > .5 && playerAllies.Length > 0 && isCaptain)
+        {
+            closestAllyObject = GetClosestGameObject(playerAllies, transform.position);
+            weapon.FireEM(positionWithMostAllies);
+            timer = 0;
+        }
     }
 
     void UpdateTarget()
@@ -400,6 +411,8 @@ public class EnemyBasic : MonoBehaviour
             else
             {
                 target = closestCaptainT.position;
+                rallyCpt = closestCaptain;
+                cptTransform = rallyCpt.transform;
                 rallied = true;
             }
         }
@@ -436,6 +449,7 @@ public class EnemyBasic : MonoBehaviour
 
     void FixedUpdate()
     {
+        velocity = rb.velocity;
         if (Dissolve.dissolveDone)
         {
             StartCoroutine(DelayedDisable());
@@ -536,6 +550,12 @@ public class EnemyBasic : MonoBehaviour
         {
             if (Vector2.Distance(rb.position, target) > distanceThreshold)
             {
+                if(rallied){
+                     if(Vector2.Distance(rb.position, cptTransform.position) > distanceThreshold) {
+                        rb.velocity = rallyCpt.GetComponent<Rigidbody2D>().velocity;
+                     }
+                }
+               else
                 rb.AddForce(Accelerator(rbTransform.up) * thrustPower);
             }
             else
@@ -547,13 +567,7 @@ public class EnemyBasic : MonoBehaviour
                 }
             }
         }
-        float dot = Vector3.Dot(transform.up, fireDirection.normalized);
-        if (timer > fireRate && dot > .5 && playerAllies.Length > 0 && isCaptain)
-        {
-            closestAllyObject = GetClosestGameObject(playerAllies, transform.position);
-            weapon.FireEM(positionWithMostAllies);
-            timer = 0;
-        }
+float dot = Vector3.Dot(transform.up, fireDirection.normalized);
         if (
             timer > fireRate
             && dot > .9

@@ -22,7 +22,7 @@ public class Missile : MonoBehaviour
     public Vector2 target;
     public GameObject targetGameObject;
     private float explosionRadius = 50f;
-    private float explosionForce = 100f;
+    private float explosionForce = 50f;
     private float timer = 0;
     private float targetAngle;
     private Vector2 predictedTarget;
@@ -81,6 +81,11 @@ public class Missile : MonoBehaviour
         // targetGameObject = EMTarget;
         target = EMTarget;
     }
+    public void SetPlayerTarget(PlayerController MTarget)
+    {
+        // targetGameObject = EMTarget;
+        targetGameObject = MTarget.fireTarget;
+    }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
@@ -112,33 +117,53 @@ public class Missile : MonoBehaviour
         Collider2D[] colliders = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
         if (gameObject.tag == "Missile")
         {
+            float effectMod = 1;
+            
             foreach (Collider2D hit in colliders)
             {
+                bool contact = false;
                 Rigidbody2D rb = hit.GetComponent<Rigidbody2D>();
                 if (rb != null)
                 {
                     Vector2 direction = rb.transform.position - transform.position;
                     float distance = direction.magnitude;
-                    float effect = 1 - (distance / explosionRadius);
+                    float effect = (1 - (distance / explosionRadius)) * effectMod;
+                    if (effect<0){
+                        effect = 0;
+                    }
                     Vector2 force = direction.normalized * explosionForce * effect;
 
                     if (hit.tag == "BasicEnemy")
                     {
+                        contact = true;
                         rb.gameObject.GetComponent<EnemyBasic>().hp += effect * .4f;
                         // rb.AddForce(force, ForceMode2D.Impulse);
                         rb.AddForce(force * rb.mass * 50);
+
                     }
                     if (hit.tag == "EnemyCaptain")
                     {
+                        contact = true;
                         rb.gameObject.GetComponent<EnemyBasic>().hp += effect * .2f;
                     }
+                     if(contact){
+                    if (effectMod > 0){
+                        effectMod -= .1f;
+                    }
+                    else {
+                        effectMod = .1f;
+                    }
                 }
+                }
+               
             }
         }
         else
         {
+            float effectMod = 1;
             foreach (Collider2D hit in colliders)
             {
+                bool contact = false;
                 Rigidbody2D rb = hit.GetComponent<Rigidbody2D>();
                 if (rb != null)
                 {
@@ -149,17 +174,27 @@ public class Missile : MonoBehaviour
 
                     if (rb.tag == "Clone")
                     {
+                        contact = true;
                         rb.gameObject.GetComponent<PlayerCopy>().hp -= effect * .4f;
                         // rb.AddForce(force, ForceMode2D.Impulse);
                         rb.AddForce(force * rb.mass * 50);
                     }
                     if (rb.tag == "Player")
                     {
+                        contact = true;
                         rb.GetComponent<PlayerController>().ApplyDmg(.1f);
                         // rb.AddForce(force, ForceMode2D.Impulse);
                         rb.AddForce(force * rb.mass * 50);
                     }
                 }
+                   if(contact){
+                    if (effectMod > 0){
+                        effectMod -= .1f;
+                    }
+                    else {
+                        effectMod = .1f;
+                    }
+                   }
             }
         }
 
@@ -194,10 +229,10 @@ public class Missile : MonoBehaviour
         {
             if (gameObject.tag == "Missile")
             {
-                targetGameObject = UM.Instance.GetClosestGameObject(
-                    UM.Instance.enemies,
-                    transform.position
-                );
+                // targetGameObject = UM.Instance.GetClosestGameObject(
+                //     UM.Instance.enemies,
+                //     transform.position
+                // );
                 target = targetGameObject.GetComponent<Rigidbody2D>().transform.position;
             }
             // else Explode();

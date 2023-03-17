@@ -33,7 +33,10 @@ public class UM : MonoBehaviour
     public GameObject[] cloneArray;
     public GameObject[] playerArray;
     public GameObject[] combinedAllies;
-
+    public Color color1;
+    public Color color2;
+    public Color color3;
+    public Color color4;
     void Awake()
     {
         Instance = this;
@@ -41,6 +44,7 @@ public class UM : MonoBehaviour
 
     void Start()
     {
+        playerArray = GameObject.FindGameObjectsWithTag("Player");
         AICount = 1;
         currentTask = 0;
         InvokeRepeating("UpdateGlobal", 0f, 1f);
@@ -78,6 +82,26 @@ public class UM : MonoBehaviour
     //     AICount--;
     //     AIRemoved = id;
     // }
+    
+    public GameObject GetClosestPlayerGameObject(Vector3 position)
+    {
+        float distance = Mathf.Infinity;
+        Transform closestTransform = null;
+        float closestDistance = float.MaxValue;
+        GameObject closestGameObject = null;
+        foreach (GameObject gameObject in playerArray)
+        {
+            Transform transform = gameObject.transform;
+            distance = (transform.position - position).sqrMagnitude;
+            if (distance < closestDistance)
+            {
+                closestTransform = transform;
+                closestDistance = distance;
+                closestGameObject = gameObject;
+            }
+        }
+        return closestGameObject;
+    }
     public Transform GetClosestTransform(GameObject[] gameObjects, Vector3 position)
     {
         float distance = Mathf.Infinity;

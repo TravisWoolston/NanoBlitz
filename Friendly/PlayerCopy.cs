@@ -60,6 +60,7 @@ public class PlayerCopy : MonoBehaviour
     VectorGrid shield;
     bool activeShield = false;
     float shieldTimer = 0;
+    GameObject[] playerArray;
 
     void Start()
     {
@@ -88,14 +89,14 @@ public class PlayerCopy : MonoBehaviour
 
     void OnEnable()
     {
-        player = GameObject.FindGameObjectsWithTag("Player")[0];
-        playerT = player.transform;
-        playerC = player.GetComponent<PlayerController>();
+        uM = UM.Instance;
+
         shieldTimer = 0;
         activeShield = true;
         // rallied = false;
         hp = 1;
-        allies = playerC.allies;
+
+            
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -152,7 +153,7 @@ public class PlayerCopy : MonoBehaviour
     void UpdateTarget()
     {
         allies = uM.allies;
-        distanceThreshold = (10f + allies / 6) * (playerC.maxHp / playerC.hp);
+        distanceThreshold = playerC.distanceThreshold;
 
         fireThreshold = (70f + allies) * playerC.hp;
         enemies = FilterEnemiesByDistance(uM.enemies, transform.position, fireThreshold);
@@ -193,6 +194,14 @@ public class PlayerCopy : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (player == null)
+        {
+            player = uM.GetClosestPlayerGameObject(gameObject.transform.position);
+            playerT = player.transform;
+            playerC = player.GetComponent<PlayerController>();
+            allies = playerC.allies;
+        }
+
         if (Vector2.Distance(playerT.position, transform.position) < distanceThreshold + 5)
         {
             if (rb.velocity.magnitude < playerC.velocity.magnitude)
@@ -313,7 +322,10 @@ public class PlayerCopy : MonoBehaviour
 
     void Update()
     {
-        if (magnitude > 30)
+        if (
+            magnitude > 30
+            && Vector2.Distance(playerT.position, rbTransform.position) > distanceThreshold
+        )
         {
             VGPos = rb.position;
             VGPos.z = VGZ;

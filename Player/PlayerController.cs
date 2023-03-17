@@ -60,7 +60,7 @@ public class PlayerController : MonoBehaviour
     public float VGForce = .03f;
     public float VGRadius = .03f;
     private Color color;
-    public VectorGrid VG;
+    // public VectorGrid VG;
     float thrustPower;
     public float VGZ = 10;
     Vector3 VGPos;
@@ -78,7 +78,14 @@ public class PlayerController : MonoBehaviour
     float sTimer = 0;
     public Vector3 velocity;
     UM uM;
-
+    float dodgeCD = 0;
+    public float distanceThreshold =0;
+    Collider2D[] targets;
+    Vector3 initialScale;
+    Collider2D[] colliders;
+    public GameObject playerCam;
+    private CamMovement playerCamC;
+    private float maxZoom;
     void Awake()
     {
         rb.gravityScale = 1;
@@ -93,7 +100,7 @@ public class PlayerController : MonoBehaviour
         sHP = sHPMax;
         rbTransform = rb.transform;
         uM = UM.Instance;
-
+        playerCamC = playerCam.GetComponent<CamMovement>();
         rb.angularDrag = 100;
         rb.drag = 1f;
         rb.gravityScale = 1;
@@ -110,12 +117,19 @@ public class PlayerController : MonoBehaviour
         // HPBar = HealthBar.Instance;
         HPBar.SetMaxHealth(hp);
         ShieldMeter.SetMaxHealth(sHP);
-        InvokeRepeating("UpdateGlobal", 0f, 1f);
+        InvokeRepeating("UpdateGlobal", 0f, .5f);
+        initialScale = rbTransform.localScale;
     }
 
     private void UpdateGlobal()
     {
         enemies = uM.enemies;
+        targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
+        rbTransform.localScale = initialScale * maxHp;
+        colliders = Physics2D.OverlapCircleAll(transform.position, maxHp * 5);
+        playerCamC.maxZoom = maxHp * 10;
+        // shield.m_GridWidth = 8 + (int)Mathf.Round(maxHp);
+        // shield.m_GridHeight = 13 + (int)Mathf.Round(maxHp);
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -154,13 +168,15 @@ public class PlayerController : MonoBehaviour
                 accTimer -= Time.deltaTime;
             }
         }
-        if (Input.GetKey(KeyCode.A))
+        if (Input.GetKey(KeyCode.A) && dodgeCD > 2)
         {
-            rb.AddForce(-rbTransform.right * thrustPower);
+            dodgeCD = 0;
+            rb.AddForce(-rbTransform.right * thrustPower*150);
         }
-        if (Input.GetKey(KeyCode.D))
+        if (Input.GetKey(KeyCode.D) && dodgeCD > 2)
         {
-            rb.AddForce(rbTransform.right * thrustPower);
+            dodgeCD = 0;
+            rb.AddForce(rbTransform.right * thrustPower*150);
         }
     }
 
@@ -182,10 +198,64 @@ public class PlayerController : MonoBehaviour
         return moveDirection * (smoothAccel / 5);
     }
 
+    void recoverHP(){
+                    hpDrain.enabled = true;
+            GameObject targetObject = null;
+            float mostHp = -1;
+            foreach (Collider2D tgt in targets)
+            {
+                GameObject go = tgt.gameObject;
+                if (go.tag == "Clone")
+                {
+                    PlayerCopy playerCopy = go.GetComponent<PlayerCopy>();
+                    if (playerCopy.hp > mostHp)
+                    {
+                        mostHp = playerCopy.hp;
+                        targetObject = go;
+                    }
+                }
+            }
+
+            if (targetObject != null)
+            {
+                targetObject.GetComponent<PlayerCopy>().hp -= 0.005f;
+                hp += .002f;
+                HPBar.SetHealth(hp);
+                hpDrain.SetPosition(0, rbTransform.position);
+                hpDrain.SetPosition(1, targetObject.transform.position);
+            }
+    }
+    void Upgrade(){
+                    hpDrain.enabled = true;
+            GameObject targetObject = null;
+            float mostHp = -1;
+            foreach (Collider2D tgt in targets)
+            {
+                GameObject go = tgt.gameObject;
+                if (go.tag == "Clone")
+                {
+                    PlayerCopy playerCopy = go.GetComponent<PlayerCopy>();
+                    if (playerCopy.hp > mostHp)
+                    {
+                        mostHp = playerCopy.hp;
+                        targetObject = go;
+                    }
+                }
+            }
+
+            if (targetObject != null)
+            {
+                targetObject.GetComponent<PlayerCopy>().hp -= 0.005f;
+                maxHp += .002f;
+                HPBar.SetMaxHealth(maxHp);
+                hpDrain.SetPosition(0, rbTransform.position);
+                hpDrain.SetPosition(1, targetObject.transform.position);
+            }
+    }
     private void FixedUpdate()
     {
         velocity = rb.velocity;
-
+distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
         if (sHP <= 0)
         {
             shield.GetComponent<MeshRenderer>().enabled = false;
@@ -195,9 +265,10 @@ public class PlayerController : MonoBehaviour
             shield.GetComponent<MeshRenderer>().enabled = true;
         }
         Movement();
-        VGZ = VG.transform.position.z;
+        VGZ = uM.VG.transform.position.z;
         magnitude = rb.velocity.magnitude;
-        rocketTimer += Time.deltaTime;
+        rocketTimer += Time.deltaTime * maxHp;
+        dodgeCD += Time.deltaTime;
         if (rocketTimer > rocketChargeTime)
         {
             rocketTimer = 0;
@@ -239,13 +310,23 @@ public class PlayerController : MonoBehaviour
         }
 
         float dot = Vector3.Dot(transform.up, direction.normalized);
-
+        if(Input.GetKey(KeyCode.F)){
+            Upgrade();
+        } else {
+             if (hp < maxHp)
+        {
+            recoverHP();
+        }
+        else
+            hpDrain.enabled = false;
+        }
         if (timer > .3f && dot > .9)
         {
             if (Input.GetMouseButton(1) && missiles > 0)
             {
+                fireTarget = uM.GetClosestGameObject(enemies, mousePosition);
                 missiles--;
-                weapon.FireMissile();
+                weapon.FireMissile(GetComponent<PlayerController>());
                 timer = 0;
                 missileLaunch.Play();
             }
@@ -256,57 +337,25 @@ public class PlayerController : MonoBehaviour
             // }
         }
     }
-
     void Update()
     {
         if (allies < uM.allies)
         {
             allies = uM.allies;
-            maxHp = 1 + (allies / 10);
             sHPMax = .5f + (allies / 15);
-            HPBar.SetMaxHealth(maxHp);
             ShieldMeter.SetMaxHealth(sHPMax);
         }
         if (sTimer >= 5 && sHP < sHPMax)
         {
-            sHP += .001f;
+            sHP += sHPMax/1000;
             if (sHP > sHPMax)
                 sHP = sHPMax;
             ShieldMeter.SetHealth(sHP);
         }
         sTimer += Time.deltaTime;
-        float mostHp = -1;
-        if (hp < maxHp)
-        {
-            hpDrain.enabled = true;
-            Collider2D[] targets = Physics2D.OverlapCircleAll(rbTransform.position, 30);
-            GameObject targetObject = null;
-
-            foreach (Collider2D tgt in targets)
-            {
-                GameObject go = tgt.gameObject;
-                if (go.tag == "Clone")
-                {
-                    PlayerCopy playerCopy = go.GetComponent<PlayerCopy>();
-                    if (playerCopy.hp > mostHp)
-                    {
-                        mostHp = playerCopy.hp;
-                        targetObject = go;
-                    }
-                }
-            }
-
-            if (targetObject != null)
-            {
-                targetObject.GetComponent<PlayerCopy>().hp -= 0.005f;
-                hp += .002f;
-                HPBar.SetHealth(hp);
-                hpDrain.SetPosition(0, rbTransform.position);
-                hpDrain.SetPosition(1, targetObject.transform.position);
-            }
-        }
-        else
-            hpDrain.enabled = false;
+        
+       
+        
 
         if (Input.GetMouseButton(0))
         {
@@ -316,7 +365,7 @@ public class PlayerController : MonoBehaviour
             VGMouse.z = VGZ;
             LayerMask targetMask = 1;
             // Collider2D[] targets = Physics2D.OverlapCircleAll(mousePosition, 30);
-            VG.AddGridForce(VGMouse, 3, 2, rippleColor, false);
+            uM.VG.AddGridForce(VGMouse, 3, 2, rippleColor, false);
             // foreach (Collider2D tgt in targets)
             // {
             //     GameObject go = tgt.gameObject;
@@ -328,25 +377,16 @@ public class PlayerController : MonoBehaviour
         }
 
         VGPos = rb.position;
-        VGPos.z = VGZ;
-        VG.AddGridForce(VGPos, 3, 2, rippleColor, true);
-    }
-
-    void LateUpdate()
-    {
-        shield.transform.rotation = Quaternion.Euler(
-            0.0f,
-            0.0f,
-            gameObject.transform.rotation.z * -1.0f
-        );
-        Collider2D[] colliders = Physics2D.OverlapCircleAll(transform.position, 5);
-
+        VGPos.z = uM.VGZ;
+        uM.VG.AddGridForce(VGPos, 5, maxHp * 1.2f, uM.color1, true);
+          
+        
         foreach (Collider2D hit in colliders)
         {
             Rigidbody2D rb = hit.GetComponent<Rigidbody2D>();
             if (rb != null)
             {
-                if (rb.tag != this.tag)
+                if (rb.tag != this.tag && rb.tag != "Bullet")
                 {
                     Transform colTransform = rb.transform;
                     Vector3 colVec = new Vector3(
@@ -358,6 +398,16 @@ public class PlayerController : MonoBehaviour
                 }
             }
         }
+    }
+
+    void LateUpdate()
+    {
+        shield.transform.rotation = Quaternion.Euler(
+            0.0f,
+            0.0f,
+            gameObject.transform.rotation.z * -1.0f
+        );
+      
     }
 }
 

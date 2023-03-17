@@ -7,9 +7,9 @@ public class CamMovement : MonoBehaviour
     public Transform player;
     float targets = 0;
     float clones = 0;
-    float startSize = 70f;
-    float targetSize = 70f;
-    float size = 0;
+    public float startSize = 80f;
+    public float targetSize = 70f;
+    public float size = 0;
     private Vector3 velocity = Vector3.zero;
     private Vector3 offset = new Vector3(0f, 0f, -10f);
     public GameObject cam;
@@ -17,7 +17,7 @@ public class CamMovement : MonoBehaviour
     private float scaleRate;
     PlayerController pC;
     public GameObject VG;
-
+    public float maxZoom = 0;
     void Awake() { }
 
     void Start()
@@ -38,6 +38,7 @@ public class CamMovement : MonoBehaviour
     // Update is called once per frame
     void LateUpdate()
     {
+        zoomRate = .05f * maxZoom/10;
         if (Input.GetAxis("Mouse ScrollWheel") > 0f) // forward
         {
             targetSize -= 1;
@@ -48,7 +49,7 @@ public class CamMovement : MonoBehaviour
         }
         if (this.gameObject.tag != "MiniMap")
         {
-            if (size < targetSize && size < 110)
+            if (size < targetSize && size < 110 + maxZoom)
             {
                 size += zoomRate;
                 VG.transform.localScale += new Vector3(scaleRate, scaleRate, 0);
