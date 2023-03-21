@@ -81,10 +81,10 @@ public class Missile : MonoBehaviour
         // targetGameObject = EMTarget;
         target = EMTarget;
     }
-    public void SetPlayerTarget(PlayerController MTarget)
+    public void SetPlayerTarget(GameObject MTarget)
     {
         // targetGameObject = EMTarget;
-        targetGameObject = MTarget.fireTarget;
+        targetGameObject = MTarget;
     }
 
     private void OnCollisionEnter2D(Collision2D collision)

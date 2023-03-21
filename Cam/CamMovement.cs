@@ -45,6 +45,7 @@ player = playerT;
 }
     void LateUpdate()
     {
+        if(player == null) return;
         zoomRate = .05f * maxZoom/10;
         if (Input.GetAxis("Mouse ScrollWheel") > 0f) // forward
         {

@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class HealthBar : MonoBehaviour
+public class ShieldBar : MonoBehaviour
 {
-    public static HealthBar Instance;
+    public static ShieldBar Instance;
+
     public Slider slider;
     public Gradient gradient;
     float maxHP;

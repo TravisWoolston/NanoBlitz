@@ -3,11 +3,15 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.Networking;
+
 public class Weapon : MonoBehaviour
 {
     public GameObject bulletPrefab;
     public Transform firePoint;
     public float fireForce = 120f;
+    // SinglePooledDynamicSpawner missileNetSpawn;
+    // public NetworkObjectPool netPool;
+    // public GameObject missilePrefab;
 
     // public GameObject sparkPrefab;
     void Start()
@@ -21,20 +25,14 @@ public class Weapon : MonoBehaviour
         if (bullet != null)
         {
             bullet.transform.position = firePoint.position;
-            // bullet.transform.rotation = firePoint.rotation;
 
             bullet.SetActive(true);
             bullet
                 .GetComponent<Rigidbody2D>()
                 .AddForce(firePoint.up * fireForce, ForceMode2D.Impulse);
         }
-        // GameObject bullet = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
-
-
-        // Object.Destroy(this.gameObject, 1);
     }
-
-    public void FireMissile(PlayerController playerC)
+    public void FireMissile(GameObject fireTarget)
     {
         GameObject missile = ObjectPool.SharedInstance.GetMissile();
         if (missile != null)
@@ -42,14 +40,41 @@ public class Weapon : MonoBehaviour
             missile.transform.position = firePoint.position;
             missile.transform.rotation = transform.rotation;
 
-            missile.GetComponent<Missile>().SetPlayerTarget(playerC);
+            
             // missile.GetComponent<NetworkObject>().Spawn();
+            missile.GetComponent<Missile>().SetPlayerTarget(fireTarget);
             missile.SetActive(true);
+            
             // missile.GetComponent<NetworkObject>().Spawn();
             missile.GetComponent<Rigidbody2D>().velocity += (Vector2)(firePoint.up * 100);
             //  missile.GetComponent<Rigidbody2D>().AddForce(firePoint.up * 1000);
         }
     }
+    // public void FireMissile(PlayerController playerC)
+    // {
+    //     // GameObject missile = ObjectPool.SharedInstance.GetMissile();
+    //     // missile.SetActive(true);
+       
+    //     NetworkObject netMissile = missileNetSpawn.Instantiate(
+    //         NetworkManager.Singleton.LocalClientId,
+    //         firePoint.position,
+    //         transform.rotation
+    //     );
+    //     // netMissile.GetComponent<NetworkObject>().Spawn(null, true);
+
+    //     if (netMissile != null)
+    //     {
+    //         // netMissile.transform.position = firePoint.position;
+    //         // netMissile.transform.rotation = transform.rotation;
+
+    //         netMissile.GetComponent<Missile>().SetPlayerTarget(playerC);
+    //         // missile.GetComponent<NetworkObject>().Spawn();
+
+    //         // missile.GetComponent<NetworkObject>().Spawn();
+    //         netMissile.GetComponent<Rigidbody2D>().velocity += (Vector2)(firePoint.up * 100);
+    //         //  missile.GetComponent<Rigidbody2D>().AddForce(firePoint.up * 1000);
+    //     }
+    // }
 
     public void FireEM()
     {

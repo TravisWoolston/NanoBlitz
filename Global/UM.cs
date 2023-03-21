@@ -191,7 +191,7 @@ public class UM : MonoBehaviour
     }
     void FixedUpdate()
     {
-
+playerArray = GameObject.FindGameObjectsWithTag("Player");
         VGZ = VG.transform.position.z;
     }
 }

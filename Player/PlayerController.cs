@@ -6,11 +6,12 @@ using Pathfinding;
 using UnityEngine.AI;
 using Unity.Netcode;
 using UnityEngine.Networking;
+
 public class PlayerController : NetworkBehaviour
 {
-//    public override void OnNetworkSpawn() {
-//     if(!IsOwner) Destroy(this);
-//    }
+       public override void OnNetworkSpawn() {
+        if(!IsOwner) return;
+       }
     public float maxSpeed = 100f;
     public float moveSpeed = 40f;
     public float acceleration = 5f;
@@ -63,6 +64,7 @@ public class PlayerController : NetworkBehaviour
     public float VGForce = .03f;
     public float VGRadius = .03f;
     private Color color;
+
     // public VectorGrid VG;
     float thrustPower;
     public float VGZ = 10;
@@ -72,8 +74,8 @@ public class PlayerController : NetworkBehaviour
     public VectorGrid VGShield;
     VectorGrid shield;
     bool activeShield = false;
-    public HealthBar HPBar;
-    public HealthBar ShieldMeter;
+    private HealthBar HPBar;
+    private ShieldBar ShieldMeter;
     float sHPMax = .5f;
     float sHP;
     public LineRenderer hpDrain;
@@ -82,7 +84,7 @@ public class PlayerController : NetworkBehaviour
     public Vector3 velocity;
     UM uM;
     float dodgeCD = 0;
-    public float distanceThreshold =0;
+    public float distanceThreshold = 0;
     Collider2D[] targets;
     Vector3 initialScale;
     Collider2D[] colliders;
@@ -90,6 +92,7 @@ public class PlayerController : NetworkBehaviour
     public CamMovement playerCamC;
     private float maxZoom;
     public float playerID = 0;
+
     void Awake()
     {
         rb.gravityScale = 1;
@@ -100,12 +103,12 @@ public class PlayerController : NetworkBehaviour
 
     void Start()
     {
-
+        if(!IsOwner) return;
         hp = maxHp;
         sHP = sHPMax;
         rbTransform = rb.transform;
         uM = UM.Instance;
-        
+
         rb.angularDrag = 100;
         rb.drag = 1f;
         rb.gravityScale = 1;
@@ -120,16 +123,23 @@ public class PlayerController : NetworkBehaviour
         shield = Instantiate(VGShield, rbTransform);
         // shield.transform.SetParent(gameObject.transform);
         // HPBar = HealthBar.Instance;
-        HPBar.SetMaxHealth(hp);
-        ShieldMeter.SetMaxHealth(sHP);
+       
         InvokeRepeating("UpdateGlobal", 0f, .5f);
         initialScale = rbTransform.localScale;
         playerID = uM.GetPlayerID();
-        if(IsOwner){
-        playerCam = GameObject.Find("Main Camera");
-        playerCamC = playerCam.GetComponent<CamMovement>();
-        playerCamC.player = rbTransform;
-        }
+
+            playerCam = GameObject.Find("Main Camera");
+            HPBar = HealthBar.Instance;
+            ShieldMeter = ShieldBar.Instance;
+            playerCamC = playerCam.GetComponent<CamMovement>();
+            playerCamC.player = rbTransform;
+
+         HPBar.SetMaxHealth(hp);
+
+         HPBar.SetHealth(hp);
+        ShieldMeter.SetMaxHealth(sHP);
+
+        ShieldMeter.SetHealth(sHP);
     }
 
     private void UpdateGlobal()
@@ -138,8 +148,8 @@ public class PlayerController : NetworkBehaviour
         targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
         rbTransform.localScale = initialScale * maxHp;
         colliders = Physics2D.OverlapCircleAll(transform.position, maxHp * 5);
-        if(playerCamC != null)
-        playerCamC.maxZoom = maxHp * 10;
+        if (playerCamC != null)
+            playerCamC.maxZoom = maxHp * 10;
         // shield.m_GridWidth = 8 + (int)Mathf.Round(maxHp);
         // shield.m_GridHeight = 13 + (int)Mathf.Round(maxHp);
     }
@@ -154,6 +164,7 @@ public class PlayerController : NetworkBehaviour
 
     public void ApplyDmg(float dmg)
     {
+        if(!IsOwner) return;
         if (sHP > 0)
         {
             sHP -= dmg;
@@ -183,12 +194,12 @@ public class PlayerController : NetworkBehaviour
         if (Input.GetKey(KeyCode.A) && dodgeCD > 2)
         {
             dodgeCD = 0;
-            rb.AddForce(-rbTransform.right * thrustPower*150);
+            rb.AddForce(-rbTransform.right * thrustPower * 150);
         }
         if (Input.GetKey(KeyCode.D) && dodgeCD > 2)
         {
             dodgeCD = 0;
-            rb.AddForce(rbTransform.right * thrustPower*150);
+            rb.AddForce(rbTransform.right * thrustPower * 150);
         }
     }
 
@@ -210,64 +221,69 @@ public class PlayerController : NetworkBehaviour
         return moveDirection * (smoothAccel / 5);
     }
 
-    void recoverHP(){
-                    hpDrain.enabled = true;
-            GameObject targetObject = null;
-            float mostHp = -1;
-            foreach (Collider2D tgt in targets)
+    void recoverHP()
+    {
+        hpDrain.enabled = true;
+        GameObject targetObject = null;
+        float mostHp = -1;
+        foreach (Collider2D tgt in targets)
+        {
+            GameObject go = tgt.gameObject;
+            if (go.tag == "Clone")
             {
-                GameObject go = tgt.gameObject;
-                if (go.tag == "Clone")
+                PlayerCopy playerCopy = go.GetComponent<PlayerCopy>();
+                if (playerCopy.hp > mostHp)
                 {
-                    PlayerCopy playerCopy = go.GetComponent<PlayerCopy>();
-                    if (playerCopy.hp > mostHp)
-                    {
-                        mostHp = playerCopy.hp;
-                        targetObject = go;
-                    }
+                    mostHp = playerCopy.hp;
+                    targetObject = go;
                 }
             }
+        }
 
-            if (targetObject != null)
-            {
-                targetObject.GetComponent<PlayerCopy>().hp -= 0.005f;
-                hp += .002f;
-                HPBar.SetHealth(hp);
-                hpDrain.SetPosition(0, rbTransform.position);
-                hpDrain.SetPosition(1, targetObject.transform.position);
-            }
+        if (targetObject != null)
+        {
+            targetObject.GetComponent<PlayerCopy>().hp -= 0.005f;
+            hp += .002f;
+            HPBar.SetHealth(hp);
+            hpDrain.SetPosition(0, rbTransform.position);
+            hpDrain.SetPosition(1, targetObject.transform.position);
+        }
     }
-    void Upgrade(){
-                    hpDrain.enabled = true;
-            GameObject targetObject = null;
-            float mostHp = -1;
-            foreach (Collider2D tgt in targets)
+
+    void Upgrade()
+    {
+        hpDrain.enabled = true;
+        GameObject targetObject = null;
+        float mostHp = -1;
+        foreach (Collider2D tgt in targets)
+        {
+            GameObject go = tgt.gameObject;
+            if (go.tag == "Clone")
             {
-                GameObject go = tgt.gameObject;
-                if (go.tag == "Clone")
+                PlayerCopy playerCopy = go.GetComponent<PlayerCopy>();
+                if (playerCopy.hp > mostHp)
                 {
-                    PlayerCopy playerCopy = go.GetComponent<PlayerCopy>();
-                    if (playerCopy.hp > mostHp)
-                    {
-                        mostHp = playerCopy.hp;
-                        targetObject = go;
-                    }
+                    mostHp = playerCopy.hp;
+                    targetObject = go;
                 }
             }
+        }
 
-            if (targetObject != null)
-            {
-                targetObject.GetComponent<PlayerCopy>().hp -= 0.005f;
-                maxHp += .002f;
-                HPBar.SetMaxHealth(maxHp);
-                hpDrain.SetPosition(0, rbTransform.position);
-                hpDrain.SetPosition(1, targetObject.transform.position);
-            }
+        if (targetObject != null)
+        {
+            targetObject.GetComponent<PlayerCopy>().hp -= 0.005f;
+            maxHp += .002f;
+            HPBar.SetMaxHealth(maxHp);
+            hpDrain.SetPosition(0, rbTransform.position);
+            hpDrain.SetPosition(1, targetObject.transform.position);
+        }
     }
+
     private void FixedUpdate()
     {
+        if(!IsOwner) return;
         velocity = rb.velocity;
-distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
+        distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
         if (sHP <= 0)
         {
             shield.GetComponent<MeshRenderer>().enabled = false;
@@ -322,15 +338,18 @@ distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
         }
 
         float dot = Vector3.Dot(transform.up, direction.normalized);
-        if(Input.GetKey(KeyCode.F)){
-            Upgrade();
-        } else {
-             if (hp < maxHp)
+        if (Input.GetKey(KeyCode.F))
         {
-            recoverHP();
+            Upgrade();
         }
         else
-            hpDrain.enabled = false;
+        {
+            if (hp < maxHp)
+            {
+                recoverHP();
+            }
+            else
+                hpDrain.enabled = false;
         }
         if (timer > .3f && dot > .9)
         {
@@ -338,7 +357,7 @@ distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
             {
                 fireTarget = uM.GetClosestGameObject(enemies, mousePosition);
                 missiles--;
-                weapon.FireMissile(GetComponent<PlayerController>());
+                weapon.FireMissile(fireTarget);
                 timer = 0;
                 missileLaunch.Play();
             }
@@ -349,15 +368,18 @@ distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
             // }
         }
     }
+
     void Update()
     {
-        // if(!isLocalPlayer) return;
-        if(playerCam == null){
-                    if(IsOwner){
-        playerCam = GameObject.Find("MainCamera");
-        playerCamC = playerCam.GetComponent<CamMovement>();
-        playerCamC.player = rbTransform;
-        }
+        if(!IsOwner) return;
+        if (playerCam == null)
+        {
+            if (IsOwner)
+            {
+                playerCam = GameObject.Find("Main Camera");
+                playerCamC = playerCam.GetComponent<CamMovement>();
+                playerCamC.player = rbTransform;
+            }
         }
         //         playerCam.transform.rotation = Quaternion.Euler(
         //     0.0f,
@@ -372,15 +394,12 @@ distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
         }
         if (sTimer >= 5 && sHP < sHPMax)
         {
-            sHP += sHPMax/1000;
+            sHP += sHPMax / 1000;
             if (sHP > sHPMax)
                 sHP = sHPMax;
             ShieldMeter.SetHealth(sHP);
         }
         sTimer += Time.deltaTime;
-        
-       
-        
 
         if (Input.GetMouseButton(0))
         {
@@ -404,36 +423,35 @@ distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
         VGPos = rb.position;
         VGPos.z = uM.VGZ;
         uM.VG.AddGridForce(VGPos, 5, maxHp * 1.2f, uM.color1, true);
-          
-        if(colliders != null)
-        foreach (Collider2D hit in colliders)
-        {
-            Rigidbody2D rb = hit.GetComponent<Rigidbody2D>();
-            if (rb != null)
+
+        if (colliders != null)
+            foreach (Collider2D hit in colliders)
             {
-                if (rb.tag != this.tag && rb.tag != "Bullet")
+                Rigidbody2D rb = hit.GetComponent<Rigidbody2D>();
+                if (rb != null)
                 {
-                    Transform colTransform = rb.transform;
-                    Vector3 colVec = new Vector3(
-                        colTransform.position.x,
-                        colTransform.position.y,
-                        shield.transform.position.z
-                    );
-                    shield.AddGridForce(colVec, 1f, .3f, Color.red, false);
+                    if (rb.tag != this.tag && rb.tag != "Bullet")
+                    {
+                        Transform colTransform = rb.transform;
+                        Vector3 colVec = new Vector3(
+                            colTransform.position.x,
+                            colTransform.position.y,
+                            shield.transform.position.z
+                        );
+                        shield.AddGridForce(colVec, 1f, .3f, Color.red, false);
+                    }
                 }
             }
-        }
     }
 
     void LateUpdate()
     {
+        if(!IsOwner) return;
         shield.transform.rotation = Quaternion.Euler(
             0.0f,
             0.0f,
             gameObject.transform.rotation.z * -1.0f
         );
-
-      
     }
 }
 
