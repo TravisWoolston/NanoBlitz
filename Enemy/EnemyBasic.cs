@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using Pathfinding;
 using UnityEngine;
 using UnityEngine.AI;
-
-public class EnemyBasic : MonoBehaviour
+using Unity.Netcode;
+using UnityEngine.Networking;
+public class EnemyBasic : NetworkBehaviour
 {
     public GameObject player;
     Transform playerT;
@@ -81,22 +82,22 @@ public class EnemyBasic : MonoBehaviour
     float VGRadius = 1;
     Transform[] playerAlliesT;
     float pathTimer = 0;
-    Dissolve Dissolve;
+    public Dissolve Dissolve;
     Transform rbTransform;
     float allySearchRadius = 10;
     public GameObject rallyCpt;
     Transform cptTransform;
     Vector2 velocity;
+
     void Start()
     {
         uM = UM.Instance;
-        player = GameObject.FindGameObjectsWithTag("Player")[0];
-        playerT = player.transform;
-        playerC = player.GetComponent<PlayerController>();
+        // player = GameObject.FindGameObjectsWithTag("Player")[0];
+        // playerT = player.transform;
+        // playerC = player.GetComponent<PlayerController>();
         VGZ = uM.VGZ;
         playerAllies = uM.allyArray;
         gridGraph = AstarPath.active.data.gridGraph;
-        Dissolve = GetComponent<Dissolve>();
         if (this.gameObject.tag == "EnemyCaptain")
         {
             VGRadius = 5;
@@ -139,9 +140,12 @@ public class EnemyBasic : MonoBehaviour
 
     void OnEnable()
     {
-        player = GameObject.FindGameObjectsWithTag("Player")[0];
-        playerT = player.transform;
-        playerC = player.GetComponent<PlayerController>();
+        //         if (uM.playerArray.Length > 0){
+        //  player = uM.GetClosestPlayerGameObject(rbTransform.position);
+        //         playerT = player.transform;
+        //         playerC = player.GetComponent<PlayerController>();
+        //         }
+
         if (!isCaptain)
         {
             rb.drag = 1;
@@ -228,6 +232,7 @@ public class EnemyBasic : MonoBehaviour
 
     IEnumerator DelayedDisable()
     {
+        
         yield return new WaitForSeconds(0f);
         if (gameObject.tag == "EnemyCaptain")
         {
@@ -238,6 +243,7 @@ public class EnemyBasic : MonoBehaviour
                 {
                     basicAlly.transform.position = this.transform.position;
                     basicAlly.SetActive(true);
+                    
                     basicAlly.GetComponent<Rigidbody2D>().velocity = rb.velocity;
                 }
             }
@@ -248,9 +254,11 @@ public class EnemyBasic : MonoBehaviour
             if (basicAlly != null)
             {
                 basicAlly.transform.position = this.transform.position;
+                
                 basicAlly.SetActive(true);
                 basicAlly.GetComponent<Rigidbody2D>().velocity = rb.velocity;
             }
+            
         }
 
         hp = 0;
@@ -269,6 +277,7 @@ public class EnemyBasic : MonoBehaviour
 
         AstarPath.active.UpdateGraphs(guo);
         gameObject.SetActive(false);
+        
     }
 
     GameObject GetClosestGameObject(GameObject[] gameObjects, Vector3 position)
@@ -330,7 +339,7 @@ public class EnemyBasic : MonoBehaviour
 
     void UpdateCaptainTarget()
     {
-        if (playerAlliesT == null)
+        if (player == null)
             return;
         captains = uM.captains;
 
@@ -379,7 +388,7 @@ public class EnemyBasic : MonoBehaviour
         }
         Vector2 fireDirection = fireTarget - rb.position;
         fireDirection.Normalize();
-                float dot = Vector3.Dot(transform.up, fireDirection.normalized);
+        float dot = Vector3.Dot(transform.up, fireDirection.normalized);
         if (timer > fireRate && dot > .5 && playerAllies.Length > 0 && isCaptain)
         {
             closestAllyObject = GetClosestGameObject(playerAllies, transform.position);
@@ -390,6 +399,7 @@ public class EnemyBasic : MonoBehaviour
 
     void UpdateTarget()
     {
+        if (player == null) return;
         captains = uM.captains;
 
         playerPosition = playerC.position;
@@ -449,6 +459,14 @@ public class EnemyBasic : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (player == null && uM.playerArray.Length > 0)
+        {
+            player = uM.GetClosestPlayerGameObject(gameObject.transform.position);
+
+            playerT = player.transform;
+            playerC = player.GetComponent<PlayerController>();
+        }
+    
         velocity = rb.velocity;
         if (Dissolve.dissolveDone)
         {
@@ -550,13 +568,15 @@ public class EnemyBasic : MonoBehaviour
         {
             if (Vector2.Distance(rb.position, target) > distanceThreshold)
             {
-                if(rallied){
-                     if(Vector2.Distance(rb.position, cptTransform.position) > distanceThreshold) {
+                if (rallied)
+                {
+                    if (Vector2.Distance(rb.position, cptTransform.position) > distanceThreshold)
+                    {
                         rb.velocity = rallyCpt.GetComponent<Rigidbody2D>().velocity;
-                     }
+                    }
                 }
-               else
-                rb.AddForce(Accelerator(rbTransform.up) * thrustPower);
+                else
+                    rb.AddForce(Accelerator(rbTransform.up) * thrustPower);
             }
             else
             {
@@ -567,7 +587,7 @@ public class EnemyBasic : MonoBehaviour
                 }
             }
         }
-float dot = Vector3.Dot(transform.up, fireDirection.normalized);
+        float dot = Vector3.Dot(transform.up, fireDirection.normalized);
         if (
             timer > fireRate
             && dot > .9
@@ -586,6 +606,7 @@ float dot = Vector3.Dot(transform.up, fireDirection.normalized);
 
     void Update()
     {
+        if(uM.playerArray.Length == 0) return;
         magnitude = rb.velocity.magnitude;
 
         if (magnitude > 30)

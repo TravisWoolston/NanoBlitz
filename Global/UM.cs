@@ -37,6 +37,7 @@ public class UM : MonoBehaviour
     public Color color2;
     public Color color3;
     public Color color4;
+    Camera[] playerCams;
     void Awake()
     {
         Instance = this;
@@ -157,7 +158,7 @@ public class UM : MonoBehaviour
     {
         // GameObject[] alliesArray = GameObject.FindGameObjectsWithTag("Clone");
         cloneArray = GameObject.FindGameObjectsWithTag("Clone");
-        playerArray = GameObject.FindGameObjectsWithTag("Player");
+        
         combinedAllies = new GameObject[cloneArray.Length + playerArray.Length];
         Array.Copy(playerArray, combinedAllies, playerArray.Length);
         Array.Copy(cloneArray, 0, combinedAllies, playerArray.Length, cloneArray.Length);
@@ -184,9 +185,13 @@ public class UM : MonoBehaviour
         }
     }
 
-    // Update is called once per frame
+    public float GetPlayerID(){
+        playerArray = GameObject.FindGameObjectsWithTag("Player");
+        return playerArray.Length;
+    }
     void FixedUpdate()
     {
+
         VGZ = VG.transform.position.z;
     }
 }

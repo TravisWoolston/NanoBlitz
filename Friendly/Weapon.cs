@@ -1,7 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+using Unity.Netcode;
+using UnityEngine.Networking;
 public class Weapon : MonoBehaviour
 {
     public GameObject bulletPrefab;
@@ -42,8 +43,9 @@ public class Weapon : MonoBehaviour
             missile.transform.rotation = transform.rotation;
 
             missile.GetComponent<Missile>().SetPlayerTarget(playerC);
-
+            // missile.GetComponent<NetworkObject>().Spawn();
             missile.SetActive(true);
+            // missile.GetComponent<NetworkObject>().Spawn();
             missile.GetComponent<Rigidbody2D>().velocity += (Vector2)(firePoint.up * 100);
             //  missile.GetComponent<Rigidbody2D>().AddForce(firePoint.up * 1000);
         }

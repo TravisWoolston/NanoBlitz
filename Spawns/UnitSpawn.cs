@@ -24,6 +24,9 @@ public class UnitSpawn : MonoBehaviour
 
     void Update()
     {
+        if (UM.Instance.playerArray.Length == 0) {
+            return;
+        }
         spawnTimer += Time.deltaTime;
         if (spawnTimer > spawn)
         {
@@ -49,9 +52,9 @@ public class UnitSpawn : MonoBehaviour
             spawnTimer = 0;
             if (spawn > 4)
                 if (this.gameObject.tag == "EnemyCptSpawn")
-                    spawn -= PlayerController.Instance.allies / 4;
+                    spawn -= UM.Instance.allies / 4;
                 else
-                    spawn -= PlayerController.Instance.allies / 100;
+                    spawn -= UM.Instance.allies / 100;
         }
         if (this.gameObject.tag == "EnemyCptSpawn")
         {

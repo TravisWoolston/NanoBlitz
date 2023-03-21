@@ -65,10 +65,10 @@ public class ObjectPool : MonoBehaviour
         {
             tmp = Instantiate(bulletPrefab);
             tmp.SetActive(false);
-            Physics2D.IgnoreCollision(
-                GameObject.FindGameObjectWithTag("Player").GetComponent<Collider2D>(),
-                GetComponent<Collider2D>()
-            );
+            // Physics2D.IgnoreCollision(
+            //     GameObject.FindGameObjectWithTag("Player").GetComponent<Collider2D>(),
+            //     GetComponent<Collider2D>()
+            // );
 
             //     GameObject[] allies = GameObject.FindGameObjectsWithTag("Clone");
             //     foreach (GameObject obj in basicAllies)

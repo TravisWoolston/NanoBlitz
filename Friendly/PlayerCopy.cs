@@ -55,7 +55,7 @@ public class PlayerCopy : MonoBehaviour
     Vector3 VGPos;
     public bool rallied = true;
     Transform enemyRBTransform;
-    Dissolve Dissolve;
+    public Dissolve Dissolve;
     public VectorGrid VGShield;
     VectorGrid shield;
     bool activeShield = false;
@@ -65,10 +65,10 @@ public class PlayerCopy : MonoBehaviour
     void Start()
     {
         uM = UM.Instance;
-        player = GameObject.FindGameObjectsWithTag("Player")[0];
-        playerT = player.transform;
-        playerC = player.GetComponent<PlayerController>();
-        Dissolve = GetComponent<Dissolve>();
+
+        // player = GameObject.FindGameObjectsWithTag("Player")[0];
+        // playerT = player.transform;
+        // playerC = player.GetComponent<PlayerController>();
         VGZ = uM.VGZ;
         allies = uM.allies;
         sprite = this.GetComponent<SpriteRenderer>();
@@ -152,6 +152,7 @@ public class PlayerCopy : MonoBehaviour
 
     void UpdateTarget()
     {
+        if(player == null) return;
         allies = uM.allies;
         distanceThreshold = playerC.distanceThreshold;
 
@@ -194,15 +195,16 @@ public class PlayerCopy : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (player == null)
+        if (player == null && uM.playerArray.Length > 0)
         {
             player = uM.GetClosestPlayerGameObject(gameObject.transform.position);
             playerT = player.transform;
             playerC = player.GetComponent<PlayerController>();
             allies = playerC.allies;
         }
+    if(player == null) return;
 
-        if (Vector2.Distance(playerT.position, transform.position) < distanceThreshold + 5)
+        if (Vector2.Distance(playerT.position, rbTransform.position) < distanceThreshold + 5)
         {
             if (rb.velocity.magnitude < playerC.velocity.magnitude)
                 rb.velocity = (Vector2)playerC.velocity;

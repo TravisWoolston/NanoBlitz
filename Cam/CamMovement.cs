@@ -1,9 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+using Unity.Netcode;
 public class CamMovement : MonoBehaviour
 {
+//    public override void OnNetworkSpawn() {
+//     if(!IsOwner) {
+//         Debug.Log("is owner");
+//         Destroy(this);
+//     }
+//    }
+
     public Transform player;
     float targets = 0;
     float clones = 0;
@@ -12,18 +19,16 @@ public class CamMovement : MonoBehaviour
     public float size = 0;
     private Vector3 velocity = Vector3.zero;
     private Vector3 offset = new Vector3(0f, 0f, -10f);
-    public GameObject cam;
+    public Camera cam;
     private float zoomRate = .05f;
     private float scaleRate;
-    PlayerController pC;
-    public GameObject VG;
+    // public GameObject VG;
     public float maxZoom = 0;
-    void Awake() { }
+
 
     void Start()
     {
         scaleRate = zoomRate / 50;
-        pC = PlayerController.Instance;
         if (this.gameObject.tag == "MiniMap")
         {
             cam.GetComponent<Camera>().orthographicSize = 600;
@@ -35,7 +40,9 @@ public class CamMovement : MonoBehaviour
         }
     }
 
-    // Update is called once per frame
+public void SetPlayerTransform(Transform playerT){
+player = playerT;
+}
     void LateUpdate()
     {
         zoomRate = .05f * maxZoom/10;
@@ -52,13 +59,16 @@ public class CamMovement : MonoBehaviour
             if (size < targetSize && size < 110 + maxZoom)
             {
                 size += zoomRate;
-                VG.transform.localScale += new Vector3(scaleRate, scaleRate, 0);
+                                if (this.gameObject.tag == "MainCamera")
+
+                // VG.transform.localScale += new Vector3(scaleRate, scaleRate, 0);
                 Camera.main.orthographicSize = size;
             }
             if (size > targetSize && size > 1)
             {
                 size -= zoomRate;
-                VG.transform.localScale -= new Vector3(scaleRate, scaleRate, 0);
+                if (this.gameObject.tag == "MainCamera")
+                // VG.transform.localScale -= new Vector3(scaleRate, scaleRate, 0);
                 Camera.main.orthographicSize = size;
             }
             // clones = PlayerController.Instance.allies;
@@ -69,7 +79,7 @@ public class CamMovement : MonoBehaviour
             //     // Camera.main.orthographicSize = 35 + targets/4;
             // }
         }
-        Vector3 targetPosition = player.position + offset;
+        Vector3 targetPosition = new Vector3(player.position.x, player.position.y, 0) + offset;
 
         transform.position = Vector3.SmoothDamp(
             transform.position,

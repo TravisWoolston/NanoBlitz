@@ -12,9 +12,9 @@ public class UIAIReclaimed : MonoBehaviour
     // void Start() { }
 
     // Update is called once per frame
-    void Update()
+    void FixedUpdate()
     {
-        clones = PlayerController.Instance.allies;
+        clones = UM.Instance.allies;
         AIReclaimed.text = "AI Reclaimed: " + clones;
     }
 }

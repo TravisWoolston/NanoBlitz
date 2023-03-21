@@ -4,10 +4,13 @@ using UnityEngine;
 using System;
 using Pathfinding;
 using UnityEngine.AI;
-
-public class PlayerController : MonoBehaviour
+using Unity.Netcode;
+using UnityEngine.Networking;
+public class PlayerController : NetworkBehaviour
 {
-    public static PlayerController Instance;
+//    public override void OnNetworkSpawn() {
+//     if(!IsOwner) Destroy(this);
+//    }
     public float maxSpeed = 100f;
     public float moveSpeed = 40f;
     public float acceleration = 5f;
@@ -84,23 +87,25 @@ public class PlayerController : MonoBehaviour
     Vector3 initialScale;
     Collider2D[] colliders;
     public GameObject playerCam;
-    private CamMovement playerCamC;
+    public CamMovement playerCamC;
     private float maxZoom;
+    public float playerID = 0;
     void Awake()
     {
         rb.gravityScale = 1;
-        Instance = this;
+        // Instance = this;
         color = new Color(hp, 1 - hp, 1 - hp);
         this.GetComponent<SpriteRenderer>().color = color;
     }
 
     void Start()
     {
+
         hp = maxHp;
         sHP = sHPMax;
         rbTransform = rb.transform;
         uM = UM.Instance;
-        playerCamC = playerCam.GetComponent<CamMovement>();
+        
         rb.angularDrag = 100;
         rb.drag = 1f;
         rb.gravityScale = 1;
@@ -119,6 +124,12 @@ public class PlayerController : MonoBehaviour
         ShieldMeter.SetMaxHealth(sHP);
         InvokeRepeating("UpdateGlobal", 0f, .5f);
         initialScale = rbTransform.localScale;
+        playerID = uM.GetPlayerID();
+        if(IsOwner){
+        playerCam = GameObject.Find("Main Camera");
+        playerCamC = playerCam.GetComponent<CamMovement>();
+        playerCamC.player = rbTransform;
+        }
     }
 
     private void UpdateGlobal()
@@ -127,6 +138,7 @@ public class PlayerController : MonoBehaviour
         targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
         rbTransform.localScale = initialScale * maxHp;
         colliders = Physics2D.OverlapCircleAll(transform.position, maxHp * 5);
+        if(playerCamC != null)
         playerCamC.maxZoom = maxHp * 10;
         // shield.m_GridWidth = 8 + (int)Mathf.Round(maxHp);
         // shield.m_GridHeight = 13 + (int)Mathf.Round(maxHp);
@@ -339,6 +351,19 @@ distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
     }
     void Update()
     {
+        // if(!isLocalPlayer) return;
+        if(playerCam == null){
+                    if(IsOwner){
+        playerCam = GameObject.Find("MainCamera");
+        playerCamC = playerCam.GetComponent<CamMovement>();
+        playerCamC.player = rbTransform;
+        }
+        }
+        //         playerCam.transform.rotation = Quaternion.Euler(
+        //     0.0f,
+        //     0.0f,
+        //     gameObject.transform.rotation.z * -1.0f
+        // );
         if (allies < uM.allies)
         {
             allies = uM.allies;
@@ -380,7 +405,7 @@ distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
         VGPos.z = uM.VGZ;
         uM.VG.AddGridForce(VGPos, 5, maxHp * 1.2f, uM.color1, true);
           
-        
+        if(colliders != null)
         foreach (Collider2D hit in colliders)
         {
             Rigidbody2D rb = hit.GetComponent<Rigidbody2D>();
@@ -407,6 +432,7 @@ distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
             0.0f,
             gameObject.transform.rotation.z * -1.0f
         );
+
       
     }
 }

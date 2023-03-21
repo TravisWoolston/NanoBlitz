@@ -7,14 +7,17 @@ public class UIMissileDisplay : MonoBehaviour
 {
     private float missiles = 0;
     public TMP_Text MissileDisplayText;
-
-    // Start is called before the first frame update
-    void Start() { }
+    public GameObject player;
+    PlayerController playerC;
+    
+    void Start() { 
+        playerC = player.GetComponent<PlayerController>();
+    }
 
     // Update is called once per frame
     void Update()
     {
-        missiles = PlayerController.Instance.missiles;
+        missiles = playerC.missiles;
         MissileDisplayText.text = "Missiles: " + missiles;
     }
 }
