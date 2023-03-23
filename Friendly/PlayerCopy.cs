@@ -1,8 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
-public class PlayerCopy : MonoBehaviour
+using Unity.Netcode;
+public class PlayerCopy : NetworkBehaviour
 {
     public GameObject player;
     Transform playerT;
@@ -61,7 +61,15 @@ public class PlayerCopy : MonoBehaviour
     bool activeShield = false;
     float shieldTimer = 0;
     GameObject[] playerArray;
+    public GameObject prefab;
+       public override void OnNetworkSpawn() {
+                 uM = UM.Instance;
 
+        shieldTimer = 0;
+        activeShield = true;
+        // rallied = false;
+        hp = 1;
+       }
     void Start()
     {
         uM = UM.Instance;
@@ -69,6 +77,7 @@ public class PlayerCopy : MonoBehaviour
         // player = GameObject.FindGameObjectsWithTag("Player")[0];
         // playerT = player.transform;
         // playerC = player.GetComponent<PlayerController>();
+        weapon.hasMissiles = false;
         VGZ = uM.VGZ;
         allies = uM.allies;
         sprite = this.GetComponent<SpriteRenderer>();
@@ -132,7 +141,8 @@ public class PlayerCopy : MonoBehaviour
         hp = 1;
         ParticleSystem spark = Instantiate(explosion, this.transform.position, Quaternion.identity);
         Destroy(spark, 2f);
-        gameObject.SetActive(false);
+         NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        // gameObject.SetActive(false);
     }
 
     GameObject[] FilterEnemiesByDistance(GameObject[] enemies, Vector3 origin, float distance)

@@ -1,9 +1,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
-public class Missile : MonoBehaviour
+using Unity.Netcode;
+public class Missile : NetworkBehaviour
 {
+    
+       public override void OnNetworkSpawn() {
+         
+        if(!IsOwner) return;
+       }
+    public Weapon parent;
     private float maxSpeed = 1000f;
     private float moveSpeed = 20f;
     private float acceleration = 200;
@@ -33,6 +39,7 @@ public class Missile : MonoBehaviour
     public AudioClip[] rocketSounds;
     UM uM;
     Color rippleColor = Color.blue;
+    public GameObject prefab;
 
     //     public AudioSource explosionSFX;
     //     private AudioClip exp;
@@ -81,6 +88,7 @@ public class Missile : MonoBehaviour
         // targetGameObject = EMTarget;
         target = EMTarget;
     }
+    
     public void SetPlayerTarget(GameObject MTarget)
     {
         // targetGameObject = EMTarget;
@@ -98,7 +106,7 @@ public class Missile : MonoBehaviour
             {
                 Explode();
                 timer = 0;
-                gameObject.SetActive(false);
+              // uM.despawnServerObject(prefab, NetworkObject);
             }
         }
         else
@@ -107,7 +115,7 @@ public class Missile : MonoBehaviour
             {
                 Explode();
                 timer = 0;
-                gameObject.SetActive(false);
+                // uM.despawnServerObject(prefab, NetworkObject);
             }
         }
     }
@@ -203,7 +211,7 @@ public class Missile : MonoBehaviour
         uM.AddGridForce(transform.position, -5, 8, rippleColor, true);
         uM.Explosion(transform);
 
-        gameObject.SetActive(false);
+        uM.despawnServerObject(prefab, NetworkObject);
     }
 
     Vector3 Accelerator()
@@ -220,7 +228,17 @@ public class Missile : MonoBehaviour
 
     void FixedUpdate()
     {
+        
+        timer += Time.deltaTime;
+        if (timer > 8)
+        {
+            Explode();
+            timer = 0;
+            // uM.despawnServerObject(prefab, NetworkObject);
+        }
+           
         // engine.transform.position = exhaustPoint.position;
+        if(IsOwner){
         if (targetGameObject != null && targetGameObject.activeInHierarchy)
         {
             target = targetGameObject.GetComponent<Rigidbody2D>().transform.position;
@@ -233,12 +251,18 @@ public class Missile : MonoBehaviour
                 //     UM.Instance.enemies,
                 //     transform.position
                 // );
-                target = targetGameObject.GetComponent<Rigidbody2D>().transform.position;
+                // if(targetGameObject == null){
+                //     targetGameObject = transform.parent.gameObject.GetComponent<Missile>().parent.fireTarget;
+                // }
+                target = 
+                 UM.Instance.GetClosestGameObject(
+                    UM.Instance.enemies,
+                    transform.position
+                ).transform.position;
             }
             // else Explode();
         }
-
-        timer += Time.deltaTime;
+        
 
         distance = Vector2.Distance(rb.transform.position, target);
         if (rb.velocity.magnitude == 0)
@@ -288,11 +312,6 @@ public class Missile : MonoBehaviour
             transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 3f);
         }
 
-        if (timer > 8)
-        {
-            Explode();
-            timer = 0;
-            gameObject.SetActive(false);
-        }
     }
+}
 }

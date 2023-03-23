@@ -26,11 +26,14 @@ public class NetworkManagerUI : MonoBehaviour
         hostBtn.onClick.AddListener(() =>
         {
             NetworkManager.Singleton.StartHost();
+            NetworkObjectPool.Singleton.InitializePool();
             // NetworkManager.Singleton.SceneManager.LoadScene("Overworld", LoadSceneMode.Single);
         });
         clientBtn.onClick.AddListener(() =>
         {
+
             NetworkManager.Singleton.StartClient();
+            NetworkObjectPool.Singleton.InitializePool();
         });
     }
 }

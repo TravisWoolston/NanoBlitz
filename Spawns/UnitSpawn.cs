@@ -1,17 +1,21 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Netcode;
 
-public class UnitSpawn : MonoBehaviour
+public class UnitSpawn : NetworkBehaviour
 {
     public GameObject enemyBasicPrefab;
     public float spawnTimer = 0;
     public float spawn = 15;
     public Transform firePoint;
     public float fireForce = 10f;
-
+    public GameObject basicEnemyPrefab;
+    public GameObject enemyCptPrefab;
+    UM uM;
     void Start()
     {
+        uM = UM.Instance;
         if (this.gameObject.tag == "EnemyCptSpawn")
         {
             spawn = 100;
@@ -21,6 +25,13 @@ public class UnitSpawn : MonoBehaviour
             spawn = 8;
         }
     }
+    
+void spawnUnit(GameObject unitPrefab) {
+    NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(unitPrefab, firePoint.position, transform.rotation);
+
+        unitToSpawn.GetComponent<EnemyBasic>().prefab = unitPrefab;
+        if(!unitToSpawn.IsSpawned) unitToSpawn.Spawn(true);
+}
 
     void Update()
     {
@@ -32,21 +43,21 @@ public class UnitSpawn : MonoBehaviour
         {
             if (this.gameObject.tag == "EnemyCptSpawn")
             {
-                GameObject minion = ObjectPool.SharedInstance.GetEnemyCpt();
-                if (minion != null)
-                {
-                    minion.transform.position = firePoint.position;
-                    minion.SetActive(true);
-                }
+                uM.spawnEnemyCptServerRpc(enemyCptPrefab, transform);
+                // if (minion != null)
+                // {
+                //     minion.transform.position = 
+                //     minion.SetActive(true);
+                // }
             }
             else
             {
-                GameObject minion = ObjectPool.SharedInstance.GetBasicEnemy();
-                if (minion != null)
-                {
-                    minion.transform.position = firePoint.position;
-                    minion.SetActive(true);
-                }
+                uM.spawnEnemyBasicServerRpc(basicEnemyPrefab, transform);
+                // if (minion != null)
+                // {
+                //     minion.transform.position = firePoint.position;
+                //     minion.SetActive(true);
+                // }
             }
 
             spawnTimer = 0;

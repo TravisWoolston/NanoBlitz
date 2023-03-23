@@ -2,9 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
-using Pathfinding;
-using UnityEngine.AI;
-
+using Unity.Netcode;
 public class UM : MonoBehaviour
 {
     public float VGZ = 10;
@@ -103,6 +101,52 @@ public class UM : MonoBehaviour
         }
         return closestGameObject;
     }
+    [ServerRpc]
+    public void spawnEnemyBasicServerRpc(GameObject unitPrefab, Transform objTransform) {
+        if(!NetworkManager.Singleton.IsServer) return;
+    NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(unitPrefab,objTransform.position, objTransform.rotation);
+
+        unitToSpawn.GetComponent<EnemyBasic>().prefab = unitPrefab;
+        if(!unitToSpawn.IsSpawned) unitToSpawn.Spawn(true);
+}
+    [ServerRpc]
+    public void spawnEnemyCptServerRpc(GameObject unitPrefab, Transform objTransform) {
+        if(!NetworkManager.Singleton.IsServer) return;
+    NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(unitPrefab,objTransform.position, objTransform.rotation);
+
+        unitToSpawn.GetComponent<EnemyBasic>().prefab = unitPrefab;
+        if(!unitToSpawn.IsSpawned) unitToSpawn.Spawn(true);
+}
+    [ServerRpc]
+    public void spawnCloneServerRpc(GameObject unitPrefab, Transform objTransform) {
+        if(!NetworkManager.Singleton.IsServer) return;
+    NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(unitPrefab,objTransform.position, objTransform.rotation);
+
+        unitToSpawn.GetComponent<PlayerCopy>().prefab = unitPrefab;
+        if(!unitToSpawn.IsSpawned) unitToSpawn.Spawn(true);
+}
+    [ServerRpc]
+    public NetworkObject spawnMissileServerRpc(GameObject unitPrefab, Transform objTransform) {
+ 
+    NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(unitPrefab,objTransform.position, objTransform.rotation);
+
+        unitToSpawn.GetComponent<Missile>().prefab = unitPrefab;
+        if(!unitToSpawn.IsSpawned) unitToSpawn.Spawn(true);
+        return unitToSpawn;
+}
+
+    public void despawnServerObject(GameObject unitPrefab, NetworkObject networkObject) {
+
+ NetworkObjectPool.Singleton.ReturnNetworkObject(networkObject, unitPrefab);
+despawnClientRpc(unitPrefab, networkObject);
+}
+    [ClientRpc]
+    public void despawnClientRpc(GameObject unitPrefab, NetworkObject networkObject) {
+
+ NetworkObjectPool.Singleton.ReturnNetworkObject(networkObject, unitPrefab);
+
+}
+
     public Transform GetClosestTransform(GameObject[] gameObjects, Vector3 position)
     {
         float distance = Mathf.Infinity;

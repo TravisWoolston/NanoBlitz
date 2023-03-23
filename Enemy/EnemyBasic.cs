@@ -88,7 +88,7 @@ public class EnemyBasic : NetworkBehaviour
     public GameObject rallyCpt;
     Transform cptTransform;
     Vector2 velocity;
-
+    public GameObject prefab;
     void Start()
     {
         uM = UM.Instance;
@@ -238,26 +238,12 @@ public class EnemyBasic : NetworkBehaviour
         {
             for (int i = 0; i < 5; i++)
             {
-                GameObject basicAlly = ObjectPool.SharedInstance.GetBasicAlly();
-                if (basicAlly != null)
-                {
-                    basicAlly.transform.position = this.transform.position;
-                    basicAlly.SetActive(true);
-                    
-                    basicAlly.GetComponent<Rigidbody2D>().velocity = rb.velocity;
-                }
+                uM.spawnCloneServerRpc(basicAllyPrefab, transform);
             }
         }
         else
         {
-            GameObject basicAlly = ObjectPool.SharedInstance.GetBasicAlly();
-            if (basicAlly != null)
-            {
-                basicAlly.transform.position = this.transform.position;
-                
-                basicAlly.SetActive(true);
-                basicAlly.GetComponent<Rigidbody2D>().velocity = rb.velocity;
-            }
+            uM.spawnCloneServerRpc(basicAllyPrefab, transform);
             
         }
 
@@ -276,7 +262,8 @@ public class EnemyBasic : NetworkBehaviour
         guo.setTag = 0; // set the tag to the default value to mark the nodes as walkable
 
         AstarPath.active.UpdateGraphs(guo);
-        gameObject.SetActive(false);
+         NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        // gameObject.SetActive(false);
         
     }
 
@@ -342,7 +329,7 @@ public class EnemyBasic : NetworkBehaviour
         if (player == null)
             return;
         captains = uM.captains;
-
+        playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
         playerPosition = playerC.position;
         closestPlayerAlly = GetClosestTransform(playerAllies, transform.position);
 
@@ -403,6 +390,7 @@ public class EnemyBasic : NetworkBehaviour
         captains = uM.captains;
 
         playerPosition = playerC.position;
+        playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
         closestPlayerAlly = GetClosestTransform(playerAllies, transform.position);
 
         if (captains.Length > 0 && !rallied && !isCaptain)

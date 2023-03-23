@@ -9,9 +9,7 @@ using UnityEngine.Networking;
 
 public class PlayerController : NetworkBehaviour
 {
-       public override void OnNetworkSpawn() {
-        if(!IsOwner) return;
-       }
+
     public float maxSpeed = 100f;
     public float moveSpeed = 40f;
     public float acceleration = 5f;
@@ -103,12 +101,14 @@ public class PlayerController : NetworkBehaviour
 
     void Start()
     {
-        if(!IsOwner) return;
+       
+        if(!IsOwner || !Application.isFocused) return;
         hp = maxHp;
         sHP = sHPMax;
+        
         rbTransform = rb.transform;
         uM = UM.Instance;
-
+        weapon.parent = this;
         rb.angularDrag = 100;
         rb.drag = 1f;
         rb.gravityScale = 1;
@@ -146,6 +146,7 @@ public class PlayerController : NetworkBehaviour
     {
         enemies = uM.enemies;
         targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
+ 
         rbTransform.localScale = initialScale * maxHp;
         colliders = Physics2D.OverlapCircleAll(transform.position, maxHp * 5);
         if (playerCamC != null)
@@ -283,7 +284,7 @@ public class PlayerController : NetworkBehaviour
     {
         if(!IsOwner) return;
         velocity = rb.velocity;
-        distanceThreshold = (10f + allies / 6) * (maxHp / hp) + maxHp;
+        distanceThreshold = (15f + allies / 6) * (maxHp / hp) + maxHp;
         if (sHP <= 0)
         {
             shield.GetComponent<MeshRenderer>().enabled = false;
@@ -357,7 +358,8 @@ public class PlayerController : NetworkBehaviour
             {
                 fireTarget = uM.GetClosestGameObject(enemies, mousePosition);
                 missiles--;
-                weapon.FireMissile(fireTarget);
+                Debug.Log("missile");
+                weapon.FireMissileServerRpc();
                 timer = 0;
                 missileLaunch.Play();
             }
@@ -403,7 +405,7 @@ public class PlayerController : NetworkBehaviour
 
         if (Input.GetMouseButton(0))
         {
-            fireTarget = uM.GetClosestGameObject(enemies, mousePosition);
+            
 
             VGMouse = (Vector3)mousePosition;
             VGMouse.z = VGZ;
@@ -446,6 +448,7 @@ public class PlayerController : NetworkBehaviour
 
     void LateUpdate()
     {
+
         if(!IsOwner) return;
         shield.transform.rotation = Quaternion.Euler(
             0.0f,
@@ -454,6 +457,22 @@ public class PlayerController : NetworkBehaviour
         );
     }
 }
+
+    struct PlayerData : INetworkSerializable
+    {
+        public ulong id;
+        public ushort Length;
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter {
+            serializer.SerializeValue(ref id);
+            serializer.SerializeValue(ref Length);
+        }
+    }
+
+
+
+
+
+
 
 
 
