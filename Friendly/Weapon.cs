@@ -22,14 +22,12 @@ public class Weapon : NetworkBehaviour
    
 
     // public GameObject sparkPrefab;
-    public override void OnNetworkSpawn() {
-        parent = transform.parent.gameObject.GetComponent<PlayerController>();
-    }
+   
     void Start()
     {
   
-         
-         parent = transform.parent.gameObject.GetComponent<PlayerController>();
+    
+    
         fireForce = 80f;
     }
   
@@ -47,42 +45,44 @@ public class Weapon : NetworkBehaviour
         }
     }
 
-    public void FireMissile(GameObject fireTarget)
-    {
-        if (!IsOwner)
-            return;
-        GameObject missile = ObjectPool.SharedInstance.GetMissile();
-        if (missile != null)
-        {
-            missile.transform.position = firePoint.position;
-            missile.transform.rotation = transform.rotation;
+    // public void FireMissile(GameObject fireTarget)
+    // {
+    //     if (!IsOwner)
+    //         return;
+    //     GameObject missile = ObjectPool.SharedInstance.GetMissile();
+    //     if (missile != null)
+    //     {
+    //         missile.transform.position = firePoint.position;
+    //         missile.transform.rotation = transform.rotation;
 
-            missile.GetComponent<Missile>().SetPlayerTarget(fireTarget);
-            missile.SetActive(true);
+    //         missile.GetComponent<Missile>().SetPlayerTarget(fireTarget);
+    //         missile.SetActive(true);
 
-            missile.GetComponent<Rigidbody2D>().velocity += (Vector2)(firePoint.up * 100);
-        }
-    }
+    //         missile.GetComponent<Rigidbody2D>().velocity += (Vector2)(firePoint.up * 100);
+    //     }
+    // }
     void FixedUpdate(){
+        if (!IsServer) return;
         if(!hasMissiles) return;
-        if(parent.fireTarget != null)
+        if(parent?.fireTarget != null)
         fireTarget = parent.fireTarget;
         else
         fireTarget = UM.Instance.GetClosestGameObject(UM.Instance.enemies, transform.position);
     }
-[ServerRpc(RequireOwnership=false)]
-    public void FireMissileServerRpc()
+// [ServerRpc(RequireOwnership=false)]
+// public void FireMissileServerRpc()
+    public void FireMissile(int ID)
     {
-        // if (!IsOwner)
-        //     return;
-              if(!NetworkManager.Singleton.IsServer) return;
-        NetworkObject netMissile = UM.Instance.spawnMissileServerRpc(missilePrefab, transform);
+
+// UM.Instance.spawnMissileServerRpc(transform.position, transform.rotation);
+
+// NetworkObject netMissile = UM.Instance.spawnMissileServerRpc(transform.position, transform.rotation);
       
-       Missile netMissileC = netMissile.GetComponent<Missile>();
-       netMissileC.SetPlayerTarget(fireTarget);
-        netMissileC.prefab = missilePrefab;
-        if(!netMissile.IsSpawned) netMissile.Spawn(true);
-         netMissile.GetComponent<Rigidbody2D>().AddForce(firePoint.up * 6000);
+    //    Missile netMissileC = netMissile.GetComponent<Missile>();
+    //    netMissileC.SetPlayerTarget(fireTarget);
+    //     netMissileC.prefab = missilePrefab;
+        // if(!netMissile.IsSpawned) netMissile.Spawn(true);
+        //  netMissile.GetComponent<Rigidbody2D>().AddForce(firePoint.up * 6000);
     }
 [ServerRpc]
 public void DestroyServerRpc() {

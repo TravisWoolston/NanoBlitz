@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 using Unity.Netcode;
-public class UM : MonoBehaviour
+
+public class UM : NetworkBehaviour
 {
     public float VGZ = 10;
     public static UM Instance;
@@ -12,7 +13,16 @@ public class UM : MonoBehaviour
     public float currentTask;
     private float timer = 0;
 
-    // public float AIRemoved = float.MaxValue;
+    public GameObject enemyBasicPrefab;
+    public GameObject enemyCptPrefab;
+    public GameObject clonePrefab;
+    public GameObject missilePrefab;
+    public GameObject EMPrefab;
+    public GameObject bulletPrefab;
+    public GameObject enemyBulletPrefab;
+    public GameObject playerTrail;
+    public GameObject trail;
+    public GameObject enemyTrail;
     public bool updateNeeded = false;
     private float delayTime = .7f;
     public float VGForce = .03f;
@@ -35,7 +45,9 @@ public class UM : MonoBehaviour
     public Color color2;
     public Color color3;
     public Color color4;
+    public Color[] colorArray;
     Camera[] playerCams;
+
     void Awake()
     {
         Instance = this;
@@ -44,6 +56,7 @@ public class UM : MonoBehaviour
     void Start()
     {
         playerArray = GameObject.FindGameObjectsWithTag("Player");
+        // colorArray = [color1, color2, color3, color4];
         AICount = 1;
         currentTask = 0;
         InvokeRepeating("UpdateGlobal", 0f, 1f);
@@ -68,20 +81,58 @@ public class UM : MonoBehaviour
         int indexE = UnityEngine.Random.Range(0, explosions.Length);
         exp = explosions[indexE];
 
-        //      GameObject explosionObject = Instantiate(explosionSource, splodePlace);
-        //      explosionObject.SetActive(true);
-        // AudioSource explosionAudio = explosionObject.GetComponent<AudioSource>();
-        // explosionAudio.clip = exp;
-        // explosionAudio.PlayOneShot(exp, 1f);
-        // Destroy(explosionObject, 3f);
         AudioSource.PlayClipAtPoint(exp, splodePlace.position);
     }
 
-    // public void RemoveAI(float id){
-    //     AICount--;
-    //     AIRemoved = id;
-    // }
-    
+    [ServerRpc(RequireOwnership = false)]
+    public void moveServerRpc(int ID, Vector3 thrustPower)
+    {
+        Rigidbody2D rb = playerArray[ID].GetComponent<Rigidbody2D>();
+        rb.AddForce(thrustPower);
+    }
+
+    public LineRenderer hpDrain;
+ 
+    [ServerRpc(RequireOwnership = false)]
+    public void UpgradeServerRpc(int ID, Vector3 start, Vector3 end)
+    {
+        
+        PlayerController player = playerArray[ID].GetComponent<PlayerController>();
+        // player.targetObject.GetComponent<PlayerCopy>().hp-=.002f;
+        // player.targetObject
+        //         .GetComponent<Rigidbody2D>()
+        //         .AddForce((start - end) * 500);
+        player.hpDrain.SetPosition(0, start);
+        player.hpDrain.SetPosition(1, end);
+        UpgradeClientRpc(ID, start, end);
+    }
+
+    [ClientRpc]
+    public void UpgradeClientRpc(int ID, Vector3 start, Vector3 end)
+    {
+        PlayerController player = playerArray[ID].GetComponent<PlayerController>();
+        // player.targetObject.GetComponent<PlayerCopy>().hp-=.002f;
+        // player.targetObject
+        //         .GetComponent<Rigidbody2D>()
+        //         .AddForce((start - end) * 500);
+        player.hpDrain.SetPosition(0, start);
+        player.hpDrain.SetPosition(1, end);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void rotateServerRpc(int ID, Quaternion targetRotation)
+    {
+        Transform rbTransform = playerArray[ID].GetComponent<Rigidbody2D>().transform;
+        rbTransform.rotation = Quaternion.RotateTowards(rbTransform.rotation, targetRotation, 3);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void scaleServerRpc(int ID, Vector3 targetScale)
+    {
+        Transform rbTransform = playerArray[ID].GetComponent<Rigidbody2D>().transform;
+        rbTransform.localScale = targetScale;
+    }
+
     public GameObject GetClosestPlayerGameObject(Vector3 position)
     {
         float distance = Mathf.Infinity;
@@ -101,51 +152,212 @@ public class UM : MonoBehaviour
         }
         return closestGameObject;
     }
+
+
     [ServerRpc]
-    public void spawnEnemyBasicServerRpc(GameObject unitPrefab, Transform objTransform) {
-        if(!NetworkManager.Singleton.IsServer) return;
-    NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(unitPrefab,objTransform.position, objTransform.rotation);
+    public void spawnEnemyBasicServerRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        if (!NetworkManager.Singleton.IsServer)
+            return;
 
-        unitToSpawn.GetComponent<EnemyBasic>().prefab = unitPrefab;
-        if(!unitToSpawn.IsSpawned) unitToSpawn.Spawn(true);
-}
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            enemyBasicPrefab,
+            objVector,
+            objQuat
+        );
+
+        unitToSpawn.GetComponent<EnemyBasic>().prefab = enemyBasicPrefab;
+        if (!unitToSpawn.IsSpawned)
+            unitToSpawn.Spawn(true);
+    }
+
     [ServerRpc]
-    public void spawnEnemyCptServerRpc(GameObject unitPrefab, Transform objTransform) {
-        if(!NetworkManager.Singleton.IsServer) return;
-    NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(unitPrefab,objTransform.position, objTransform.rotation);
+    public void spawnEnemyCptServerRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        if (!NetworkManager.Singleton.IsServer)
+            return;
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            enemyCptPrefab,
+            objVector,
+            objQuat
+        );
 
-        unitToSpawn.GetComponent<EnemyBasic>().prefab = unitPrefab;
-        if(!unitToSpawn.IsSpawned) unitToSpawn.Spawn(true);
-}
+        unitToSpawn.GetComponent<EnemyBasic>().prefab = enemyCptPrefab;
+        if (!unitToSpawn.IsSpawned)
+            unitToSpawn.Spawn(true);
+    }
+
     [ServerRpc]
-    public void spawnCloneServerRpc(GameObject unitPrefab, Transform objTransform) {
-        if(!NetworkManager.Singleton.IsServer) return;
-    NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(unitPrefab,objTransform.position, objTransform.rotation);
+    public void spawnCloneServerRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        if (!NetworkManager.Singleton.IsServer)
+            return;
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            clonePrefab,
+            objVector,
+            objQuat
+        );
 
-        unitToSpawn.GetComponent<PlayerCopy>().prefab = unitPrefab;
-        if(!unitToSpawn.IsSpawned) unitToSpawn.Spawn(true);
-}
-    [ServerRpc]
-    public NetworkObject spawnMissileServerRpc(GameObject unitPrefab, Transform objTransform) {
- 
-    NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(unitPrefab,objTransform.position, objTransform.rotation);
+        unitToSpawn.GetComponent<PlayerCopy>().prefab = clonePrefab;
+        if (!unitToSpawn.IsSpawned)
+            unitToSpawn.Spawn(true);
+    }
 
-        unitToSpawn.GetComponent<Missile>().prefab = unitPrefab;
-        if(!unitToSpawn.IsSpawned) unitToSpawn.Spawn(true);
-        return unitToSpawn;
-}
+    [ServerRpc(RequireOwnership = false)]
+    public void spawnMissileServerRpc(
+        Vector3 objVector,
+        Quaternion objQuat,
+        ServerRpcParams serverRpcParams = default
+    )
+    {
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            missilePrefab,
+            objVector,
+            objQuat
+        );
 
-    public void despawnServerObject(GameObject unitPrefab, NetworkObject networkObject) {
+        unitToSpawn.GetComponent<Missile>().prefab = missilePrefab;
+        if (!unitToSpawn.IsSpawned)
+            unitToSpawn.Spawn(true);
+        Missile netMissileC = unitToSpawn.GetComponent<Missile>();
 
- NetworkObjectPool.Singleton.ReturnNetworkObject(networkObject, unitPrefab);
-despawnClientRpc(unitPrefab, networkObject);
-}
+        PlayerController parent = playerArray[
+            serverRpcParams.Receive.SenderClientId
+        ].GetComponent<PlayerController>();
+        netMissileC.SetPlayerTarget(parent.fireTarget);
+        unitToSpawn.GetComponent<Rigidbody2D>().AddForce(parent.firePoint.up * 6000);
+    }
+
+    public EnemyBasic cptParent;
+    EnemyBasic parent;
+
+    public void spawnEM(Vector3 objVector, Quaternion objQuat, NetworkObject NW)
+    {
+        cptParent = NW.GetComponent<EnemyBasic>();
+        spawnEMServerRpc(objVector, objQuat);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void spawnEMServerRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            EMPrefab,
+            objVector,
+            objQuat
+        );
+
+        unitToSpawn.GetComponent<Missile>().prefab = EMPrefab;
+        if (!unitToSpawn.IsSpawned)
+            unitToSpawn.Spawn(true);
+        Missile netMissileC = unitToSpawn.GetComponent<Missile>();
+
+        netMissileC.SetTarget(cptParent.fireTarget);
+        unitToSpawn.GetComponent<Rigidbody2D>().AddForce(cptParent.firePoint.up * 6000);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void spawnBulletServerRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        // if (!NetworkManager.Singleton.IsServer)
+        //     return;
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            bulletPrefab,
+            objVector,
+            objQuat
+        );
+        unitToSpawn.GetComponent<Bullet>().prefab = bulletPrefab;
+
+        if (!unitToSpawn.IsSpawned)
+        {
+            Rigidbody2D rb = unitToSpawn.GetComponent<Rigidbody2D>();
+            unitToSpawn.Spawn(true);
+            rb.AddForce(rb.transform.up * 4000);
+        }
+
+        Debug.Log(NetworkObjectPool.Singleton.GetCurrentPrefabCount(bulletPrefab));
+        // spawnBulletClientRpc(objVector, objQuat);
+    }
+
     [ClientRpc]
-    public void despawnClientRpc(GameObject unitPrefab, NetworkObject networkObject) {
+    public void spawnBulletClientRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        Debug.Log("spawnBulletClientRpc");
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            bulletPrefab,
+            objVector,
+            objQuat
+        );
+        unitToSpawn.GetComponent<Bullet>().prefab = bulletPrefab;
+        if (!unitToSpawn.IsSpawned)
+            unitToSpawn.Spawn(true);
+        Rigidbody2D rb = unitToSpawn.GetComponent<Rigidbody2D>();
+        rb.AddForce(rb.transform.up * 2000);
+    }
 
- NetworkObjectPool.Singleton.ReturnNetworkObject(networkObject, unitPrefab);
+    [ServerRpc(RequireOwnership = false)]
+    public void spawnEnemyBulletServerRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            enemyBulletPrefab,
+            objVector,
+            objQuat
+        );
+        unitToSpawn.GetComponent<Bullet>().prefab = enemyBulletPrefab;
+        if (!unitToSpawn.IsSpawned)
+            unitToSpawn.Spawn(true);
+        Rigidbody2D rb = unitToSpawn.GetComponent<Rigidbody2D>();
+        rb.AddForce(rb.transform.up * 2000);
+        // spawnEnemyBulletClientRpc(objVector, objQuat);
+    }
 
-}
+    [ClientRpc]
+    public void spawnEnemyBulletClientRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        if (!NetworkManager.Singleton.IsServer)
+            return;
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            enemyBulletPrefab,
+            objVector,
+            objQuat
+        );
+        unitToSpawn.GetComponent<Bullet>().prefab = enemyBulletPrefab;
+        if (!unitToSpawn.IsSpawned)
+            unitToSpawn.Spawn(true);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void spawnTrailServerRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            trail,
+            objVector,
+            objQuat
+        );
+    }
+
+    GameObject missileToDespawn;
+    NetworkObject missileToDespawnNW;
+
+    public void despawn(GameObject unitPrefab)
+    {
+        missileToDespawn = unitPrefab;
+        missileToDespawnNW = unitPrefab.GetComponent<NetworkObject>();
+        //  NetworkObjectPool.Singleton.ReturnNetworkObject(missileToDespawnNW, unitPrefab);
+        despawnServerRpc();
+        // despawnClientRpc();
+    }
+
+    [ClientRpc]
+    public void despawnClientRpc()
+    {
+        NetworkObjectPool.Singleton.ReturnNetworkObject(missileToDespawnNW, missileToDespawn);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void despawnServerRpc()
+    {
+        NetworkObjectPool.Singleton.ReturnNetworkObject(missileToDespawnNW, missileToDespawn);
+    }
 
     public Transform GetClosestTransform(GameObject[] gameObjects, Vector3 position)
     {
@@ -186,6 +398,26 @@ despawnClientRpc(unitPrefab, networkObject);
         return closestGameObject;
     }
 
+    public GameObject GetClosestEnemyGameObject(Vector3 position)
+    {
+        float distance = Mathf.Infinity;
+        Transform closestTransform = null;
+        float closestDistance = float.MaxValue;
+        GameObject closestGameObject = null;
+        foreach (GameObject gameObject in enemies)
+        {
+            Transform transform = gameObject.transform;
+            distance = (transform.position - position).sqrMagnitude;
+            if (distance < closestDistance)
+            {
+                closestTransform = transform;
+                closestDistance = distance;
+                closestGameObject = gameObject;
+            }
+        }
+        return closestGameObject;
+    }
+
     public void AddGridForce(
         Vector3 position,
         float magnitude,
@@ -202,7 +434,7 @@ despawnClientRpc(unitPrefab, networkObject);
     {
         // GameObject[] alliesArray = GameObject.FindGameObjectsWithTag("Clone");
         cloneArray = GameObject.FindGameObjectsWithTag("Clone");
-        
+
         combinedAllies = new GameObject[cloneArray.Length + playerArray.Length];
         Array.Copy(playerArray, combinedAllies, playerArray.Length);
         Array.Copy(cloneArray, 0, combinedAllies, playerArray.Length, cloneArray.Length);
@@ -229,13 +461,33 @@ despawnClientRpc(unitPrefab, networkObject);
         }
     }
 
-    public float GetPlayerID(){
+    // [ServerRpc]
+    // public void AssignPlayerColorServerRpc(){
+    //     playerArray[playerArray.Length - 1].GetComponent<PlayerController>().playerColor = colorArray[playerArray.Length - 1];
+    // Debug.Log(playerArray[playerArray.Length - 1]);
+    // }
+    public int GetPlayerID()
+    {
         playerArray = GameObject.FindGameObjectsWithTag("Player");
-        return playerArray.Length;
+
+        return playerArray.Length - 1;
     }
+
     void FixedUpdate()
     {
-playerArray = GameObject.FindGameObjectsWithTag("Player");
+        playerArray = GameObject.FindGameObjectsWithTag("Player");
+        //         for(int i = 0; i < playerArray.Length; i++){
+        // playerArray[i].GetComponent<PlayerController>().enemies = enemies;
+        //         }
+
+
         VGZ = VG.transform.position.z;
+        // UMClientRpc();
+    }
+
+    [ClientRpc]
+    void UMClientRpc()
+    {
+        UM.Instance = this;
     }
 }

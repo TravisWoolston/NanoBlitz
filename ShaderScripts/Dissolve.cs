@@ -64,5 +64,6 @@ public class Dissolve : MonoBehaviour
             }
             material.SetFloat("_Fade", fade);
         }
+         material.SetFloat("_Fade", fade);
     }
 }

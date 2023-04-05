@@ -2,22 +2,24 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
-using Pathfinding;
-using UnityEngine.AI;
 using Unity.Netcode;
 using UnityEngine.Networking;
 
 public class PlayerController : NetworkBehaviour
 {
-
     public float maxSpeed = 100f;
     public float moveSpeed = 40f;
     public float acceleration = 5f;
     public float accTimer;
-    public Rigidbody2D rb;
-    public Weapon weapon;
 
+    [SerializeField]
+    private Rigidbody2D rb;
+
+    [SerializeField]
+    private Weapon weapon;
+    public Transform firePoint;
     Vector2 moveDirection;
+
     public Vector2 mousePosition;
     public Vector3 VGMouse;
     Vector2 target;
@@ -25,22 +27,18 @@ public class PlayerController : NetworkBehaviour
     Transform to;
     public float movementMultiplier = 5;
     public float timer = 0.0f;
-    public float hp;
+
+    // public NetworkVariable<float> hp = new NetworkVariable<float>();
+    public float hp = 1;
     public float maxHp = 1;
-    public float moveX;
-    public float moveY;
-    private float velocityX;
-    private float velocityXBrake;
-    private float velocityY;
-    private float velocityYBrake;
+    float sHPMax = .5f;
+    public float sHP;
     public int allies = 0;
     public bool loaded = true;
     public bool firing = false;
     Vector3 skyboxRotationAxis;
     float skyboxRotationAngle = 0;
     float rotationDampener = 0.1f;
-    public GameObject[] allyArray;
-    public Transform[] allyArrayTransform;
     public GameObject[] enemies;
     public GameObject[] captains;
     public Vector3 position;
@@ -48,11 +46,12 @@ public class PlayerController : NetworkBehaviour
     public GameObject engineParticles;
     GameObject engine;
     public Transform exhaustPoint;
-    public int missiles = 5;
+    public float missiles = 5;
     public float rocketChargeTime = 5f;
     private float rocketTimer = 0;
     public AudioSource bulletAudio;
     public AudioSource missileLaunch;
+    public AudioSource thrustAudio;
     private float explosionRadius = 5f;
     private float explosionForce = 100f;
     public GameObject explosionSource;
@@ -68,14 +67,15 @@ public class PlayerController : NetworkBehaviour
     public float VGZ = 10;
     Vector3 VGPos;
     public Transform rbTransform;
-    Color rippleColor = Color.blue;
+    public NetworkVariable<Color> playerColor = new NetworkVariable<Color>();
     public VectorGrid VGShield;
-    VectorGrid shield;
+
+    // VectorGrid VGShield;
     bool activeShield = false;
     private HealthBar HPBar;
     private ShieldBar ShieldMeter;
-    float sHPMax = .5f;
-    float sHP;
+
+    public GameObject goLR;
     public LineRenderer hpDrain;
     float dmgRate = .0314f;
     float sTimer = 0;
@@ -84,59 +84,90 @@ public class PlayerController : NetworkBehaviour
     float dodgeCD = 0;
     public float distanceThreshold = 0;
     Collider2D[] targets;
-    Vector3 initialScale;
+    public Vector3 initialScale;
     Collider2D[] colliders;
     public GameObject playerCam;
+    public GameObject playerMM;
+    public CamMovement playerMMC;
     public CamMovement playerCamC;
     private float maxZoom;
-    public float playerID = 0;
 
+    public NetworkVariable<int> playerID = new NetworkVariable<int>();
+    bool isThrusting = false;
+    private GameObject playerUIGO;
+    UIPlayerValues playerUI;
+    private GameObject missileCountUI;
+    private UIMissileDisplay missileCount;
+
+    public GameObject renderCam;
+    public CamMovement renderCamC;
+     
     void Awake()
     {
         rb.gravityScale = 1;
-        // Instance = this;
-        color = new Color(hp, 1 - hp, 1 - hp);
-        this.GetComponent<SpriteRenderer>().color = color;
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void AssignPlayerColorServerRpc()
+    {
+        playerID.Value = uM.GetPlayerID();
+
+        for (int i = 0; i < uM.playerArray.Length; i++)
+        {
+            uM.playerArray[i].GetComponent<PlayerController>().playerColor.Value = uM.colorArray[i];
+        }
     }
 
     void Start()
     {
-       
-        if(!IsOwner || !Application.isFocused) return;
-        hp = maxHp;
-        sHP = sHPMax;
-        
-        rbTransform = rb.transform;
         uM = UM.Instance;
-        weapon.parent = this;
+        hp = maxHp;
+
+        AssignPlayerColorServerRpc();
+        rb.mass = 99999;
+        rbTransform = rb.transform;
         rb.angularDrag = 100;
         rb.drag = 1f;
         rb.gravityScale = 1;
-        rb.mass = 99999;
+        initialScale = rbTransform.localScale;
+        engineParticles.GetComponent<ParticleSystem>().startColor = playerColor.Value;
+        // hpDrain = goLR.GetComponent<LineRenderer>();
+        sHP = sHPMax;
+        if (!IsOwner)
+            return;
+
+        GameObject.FindGameObjectWithTag("NMUI").SetActive(false);
+        playerUIGO = GameObject.Find("UIPlayerValues");
+        playerUI = playerUIGO.GetComponent<UIPlayerValues>();
+
         thrustPower = rb.mass * 50;
-        engine = Instantiate(engineParticles, exhaustPoint);
+
         missileLaunch.time = .5f;
         missileLaunch.pitch = UnityEngine.Random.Range(.9f, 1.1f);
         bulletAudio.pitch = UnityEngine.Random.Range(.9f, 1.8f);
+        thrustAudio.pitch = UnityEngine.Random.Range(.9f, 1.8f);
         allies = uM.allies;
-        // InvokeRepeating("Movement", 0f, .05f);
-        shield = Instantiate(VGShield, rbTransform);
-        // shield.transform.SetParent(gameObject.transform);
-        // HPBar = HealthBar.Instance;
-       
+
+        // VGShield = Instantiate(VGShield, rbTransform);
+
         InvokeRepeating("UpdateGlobal", 0f, .5f);
-        initialScale = rbTransform.localScale;
-        playerID = uM.GetPlayerID();
 
-            playerCam = GameObject.Find("Main Camera");
-            HPBar = HealthBar.Instance;
-            ShieldMeter = ShieldBar.Instance;
-            playerCamC = playerCam.GetComponent<CamMovement>();
-            playerCamC.player = rbTransform;
+        playerMM = GameObject.Find("MiniMap");
+        playerCam = GameObject.Find("Main Camera");
+        playerCamC = playerCam.GetComponent<CamMovement>();
+        playerCamC.player = rbTransform;
 
-         HPBar.SetMaxHealth(hp);
+        renderCam = GameObject.Find("Render Cam");
+        renderCamC = renderCam.GetComponent<CamMovement>();
+        renderCamC.player = rbTransform;
 
-         HPBar.SetHealth(hp);
+        HPBar = HealthBar.Instance;
+        ShieldMeter = ShieldBar.Instance;
+        playerMMC = playerMM.GetComponent<CamMovement>();
+        playerMMC.player = rbTransform;
+        HPBar.SetMaxHealth(hp);
+
+        HPBar.SetHealth(hp);
         ShieldMeter.SetMaxHealth(sHP);
 
         ShieldMeter.SetHealth(sHP);
@@ -144,18 +175,17 @@ public class PlayerController : NetworkBehaviour
 
     private void UpdateGlobal()
     {
+        // loop through player array and assign enemies array in UM?
         enemies = uM.enemies;
-        targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
- 
-        rbTransform.localScale = initialScale * maxHp;
+
         colliders = Physics2D.OverlapCircleAll(transform.position, maxHp * 5);
         if (playerCamC != null)
             playerCamC.maxZoom = maxHp * 10;
-        // shield.m_GridWidth = 8 + (int)Mathf.Round(maxHp);
-        // shield.m_GridHeight = 13 + (int)Mathf.Round(maxHp);
+        // VGShield.m_GridWidth = 8 + (int)Mathf.Round(maxHp);
+        // VGShield.m_GridHeight = 13 + (int)Mathf.Round(maxHp);
     }
 
-    private void OnCollisionEnter2D(Collision2D collision)
+    public void OnCollisionEnter2D(Collision2D collision)
     {
         if (collision.gameObject.tag == "EnemyBullet")
         {
@@ -165,42 +195,91 @@ public class PlayerController : NetworkBehaviour
 
     public void ApplyDmg(float dmg)
     {
-        if(!IsOwner) return;
+        // ApplyDmgServerRpc(dmg);
         if (sHP > 0)
         {
             sHP -= dmg;
-            ShieldMeter.SetHealth(sHP);
+
             sTimer = 0;
         }
         else
         {
             hp -= dmg;
-            HPBar.SetHealth(hp);
         }
+        if (hp < 0)
+            hp = 0;
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ApplyDmgServerRpc(float dmg)
+    {
+        if (sHP > 0)
+        {
+            sHP -= dmg;
+
+            sTimer = 0;
+        }
+        else
+        {
+            hp -= dmg;
+        }
+        if (hp < 0)
+            hp = 0;
     }
 
     void Movement()
     {
-        if (Input.GetKey(KeyCode.LeftShift))
+        if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.W))
         {
-            rb.AddForce(Accelerator(rbTransform.up) * thrustPower);
+            if (!isThrusting)
+            {
+                isThrusting = true;
+                thrustAudio.loop = true;
+                thrustAudio.Play();
+            }
+
+            if (IsServer)
+                rb.AddForce(Accelerator(rbTransform.up) * thrustPower);
+            else
+            {
+                uM.moveServerRpc(playerID.Value, Accelerator(rbTransform.up) * thrustPower);
+            }
+            thrustAudio.volume = Mathf.MoveTowards(thrustAudio.volume, .5f, Time.deltaTime * .6f);
         }
         else
         {
+            isThrusting = false;
+            thrustAudio.volume = Mathf.MoveTowards(thrustAudio.volume, 0f, Time.deltaTime * .8f);
+            if (thrustAudio.volume == 0f)
+            {
+                thrustAudio.Stop();
+                thrustAudio.loop = false;
+            }
             if (accTimer > 0)
             {
                 accTimer -= Time.deltaTime;
             }
         }
-        if (Input.GetKey(KeyCode.A) && dodgeCD > 2)
+        if (Input.GetKey(KeyCode.A))
         {
+            if (IsServer)
+            {
+                rb.AddForce(Accelerator(-rbTransform.right) * thrustPower);
+            }
+            else
+                uM.moveServerRpc(playerID.Value, Accelerator(-rbTransform.right) * thrustPower);
+
             dodgeCD = 0;
-            rb.AddForce(-rbTransform.right * thrustPower * 150);
         }
-        if (Input.GetKey(KeyCode.D) && dodgeCD > 2)
+        if (Input.GetKey(KeyCode.D))
         {
             dodgeCD = 0;
-            rb.AddForce(rbTransform.right * thrustPower * 150);
+            if (IsServer)
+            {
+                rb.AddForce(Accelerator(rbTransform.right) * thrustPower);
+            }
+            else
+                uM.moveServerRpc(playerID.Value, Accelerator(rbTransform.right) * thrustPower);
         }
     }
 
@@ -224,12 +303,18 @@ public class PlayerController : NetworkBehaviour
 
     void recoverHP()
     {
+        Debug.DrawLine(
+            rbTransform.position,
+            new Vector3(rbTransform.position.x, rbTransform.position.y + distanceThreshold, 0)
+        );
+        targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
         hpDrain.enabled = true;
-        GameObject targetObject = null;
+        float healRate = .002f * maxHp;
+        NetworkObject targetObject = null;
         float mostHp = -1;
         foreach (Collider2D tgt in targets)
         {
-            GameObject go = tgt.gameObject;
+            NetworkObject go = tgt.gameObject.GetComponent<NetworkObject>();
             if (go.tag == "Clone")
             {
                 PlayerCopy playerCopy = go.GetComponent<PlayerCopy>();
@@ -243,22 +328,40 @@ public class PlayerController : NetworkBehaviour
 
         if (targetObject != null)
         {
-            targetObject.GetComponent<PlayerCopy>().hp -= 0.005f;
-            hp += .002f;
+            Transform targetObjT = targetObject.transform;
+            targetObject.GetComponent<PlayerCopy>().hp -= healRate;
+            if (Vector2.Distance(rbTransform.position, targetObjT.position) > distanceThreshold / 2)
+                targetObject
+                    .GetComponent<Rigidbody2D>()
+                    .AddForce((rbTransform.position - targetObjT.position) * 500);
+            // UpdateHpServerRpc(healRate);
+            hp += healRate;
             HPBar.SetHealth(hp);
             hpDrain.SetPosition(0, rbTransform.position);
-            hpDrain.SetPosition(1, targetObject.transform.position);
+            hpDrain.SetPosition(1, targetObjT.position);
         }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void UpdateHpServerRpc(float hpAdd)
+    {
+        hp += hpAdd;
     }
 
     void Upgrade()
     {
+        // Debug.DrawLine(
+        //     rbTransform.position,
+        //     new Vector3(rbTransform.position.x, rbTransform.position.y + distanceThreshold, 0)
+        // );
+        NetworkObject targetObject = null;
+        targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
         hpDrain.enabled = true;
-        GameObject targetObject = null;
+        
         float mostHp = -1;
         foreach (Collider2D tgt in targets)
         {
-            GameObject go = tgt.gameObject;
+            NetworkObject go = tgt.gameObject.GetComponent<NetworkObject>();
             if (go.tag == "Clone")
             {
                 PlayerCopy playerCopy = go.GetComponent<PlayerCopy>();
@@ -273,47 +376,94 @@ public class PlayerController : NetworkBehaviour
         if (targetObject != null)
         {
             targetObject.GetComponent<PlayerCopy>().hp -= 0.005f;
+            targetObject
+                .GetComponent<Rigidbody2D>()
+                .AddForce((rbTransform.position - targetObject.transform.position) * 500);
             maxHp += .002f;
             HPBar.SetMaxHealth(maxHp);
-            hpDrain.SetPosition(0, rbTransform.position);
+            if(IsServer){
+                hpDrain.SetPosition(0, rbTransform.position);
             hpDrain.SetPosition(1, targetObject.transform.position);
+            
+            }
+            else {
+                uM.UpgradeServerRpc(playerID.Value, rbTransform.position, targetObject.transform.position);
+            }
         }
+        if(IsServer)
+        rbTransform.localScale = initialScale * maxHp;
+        else
+        uM.scaleServerRpc(playerID.Value, initialScale * maxHp);
     }
 
     private void FixedUpdate()
     {
-        if(!IsOwner) return;
+        magnitude = rb.velocity.magnitude;
+        distanceThreshold = (30 + maxHp);
         velocity = rb.velocity;
-        distanceThreshold = (15f + allies / 6) * (maxHp / hp) + maxHp;
+        mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        firing = Input.GetMouseButton(0);
+
+        fireTarget = uM.GetClosestGameObject(enemies, mousePosition);
+        if (!IsOwner)
+            return;
+
+        if (playerCam == null)
+        {
+            if (IsOwner || IsServer)
+            {
+                playerCam = GameObject.Find("Main Camera");
+                playerCamC = playerCam.GetComponent<CamMovement>();
+                playerCamC.player = rbTransform;
+                renderCam = GameObject.Find("Render Camera");
+                renderCamC = renderCam.GetComponent<CamMovement>();
+                renderCamC.player = rbTransform;
+                playerMM = GameObject.Find("MiniMap");
+                playerMMC = playerMMC.GetComponent<CamMovement>();
+                playerMMC.player = rbTransform;
+            }
+        }
+
+        if (allies < uM.allies)
+        {
+            allies = uM.allies;
+            sHPMax = .5f + (allies / 15);
+            ShieldMeter.SetMaxHealth(sHPMax);
+        }
+        if (sTimer >= 5 && sHP < sHPMax)
+        {
+            sHP += sHPMax / 1000;
+            if (sHP > sHPMax)
+                sHP = sHPMax;
+            ShieldMeter.SetHealth(sHP);
+        }
+        sTimer += Time.deltaTime;
+        ShieldMeter.SetHealth(sHP);
+        HPBar.SetHealth(hp);
+        playerUI.clones = allies;
+        playerUI.missiles = missiles;
+        playerUI.rocketRate = maxHp;
+
         if (sHP <= 0)
         {
-            shield.GetComponent<MeshRenderer>().enabled = false;
+            VGShield.GetComponent<MeshRenderer>().enabled = false;
         }
         else
         {
-            shield.GetComponent<MeshRenderer>().enabled = true;
+            VGShield.GetComponent<MeshRenderer>().enabled = true;
         }
         Movement();
         VGZ = uM.VG.transform.position.z;
-        magnitude = rb.velocity.magnitude;
-        rocketTimer += Time.deltaTime * maxHp;
-        dodgeCD += Time.deltaTime;
-        if (rocketTimer > rocketChargeTime)
-        {
-            rocketTimer = 0;
-            missiles++;
-        }
-        timer += Time.deltaTime;
-        firing = Input.GetMouseButton(0);
 
-        moveX = Input.GetAxisRaw("Horizontal");
-        moveY = Input.GetAxisRaw("Vertical");
+        rocketTimer += Time.deltaTime * maxHp;
+
+        missiles += (Time.deltaTime * maxHp) / 3;
+
+        timer += Time.deltaTime;
 
         GameObject closest = null;
 
         position = transform.position;
-
-        mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
         var offset = 90f;
 
@@ -324,12 +474,17 @@ public class PlayerController : NetworkBehaviour
 
         if (transform.rotation != targetRotation)
         {
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 3);
+            if (IsServer)
+            {
+                transform.rotation = Quaternion.RotateTowards(
+                    transform.rotation,
+                    targetRotation,
+                    3
+                );
+            }
+            else
+                uM.rotateServerRpc(playerID.Value, targetRotation);
         }
-        // else {
-        //     rb.velocity = transform.up * moveSpeed;
-        // }
-
         else
         {
             if (closest == null)
@@ -356,75 +511,37 @@ public class PlayerController : NetworkBehaviour
         {
             if (Input.GetMouseButton(1) && missiles > 0)
             {
-                fireTarget = uM.GetClosestGameObject(enemies, mousePosition);
                 missiles--;
-                Debug.Log("missile");
-                weapon.FireMissileServerRpc();
+
+                uM.spawnMissileServerRpc(firePoint.position, transform.rotation);
+
                 timer = 0;
                 missileLaunch.Play();
             }
-            // else {
-
-            // // bulletAudio.Play();
-            // // weapon.Fire();
-            // }
         }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void UpdateCServerRpc()
+    {
+        UM.Instance.playerArray[playerID.Value] = gameObject;
     }
 
     void Update()
     {
-        if(!IsOwner) return;
-        if (playerCam == null)
-        {
-            if (IsOwner)
-            {
-                playerCam = GameObject.Find("Main Camera");
-                playerCamC = playerCam.GetComponent<CamMovement>();
-                playerCamC.player = rbTransform;
-            }
-        }
-        //         playerCam.transform.rotation = Quaternion.Euler(
-        //     0.0f,
-        //     0.0f,
-        //     gameObject.transform.rotation.z * -1.0f
-        // );
-        if (allies < uM.allies)
-        {
-            allies = uM.allies;
-            sHPMax = .5f + (allies / 15);
-            ShieldMeter.SetMaxHealth(sHPMax);
-        }
-        if (sTimer >= 5 && sHP < sHPMax)
-        {
-            sHP += sHPMax / 1000;
-            if (sHP > sHPMax)
-                sHP = sHPMax;
-            ShieldMeter.SetHealth(sHP);
-        }
-        sTimer += Time.deltaTime;
+        
 
         if (Input.GetMouseButton(0))
         {
-            
-
             VGMouse = (Vector3)mousePosition;
             VGMouse.z = VGZ;
             LayerMask targetMask = 1;
-            // Collider2D[] targets = Physics2D.OverlapCircleAll(mousePosition, 30);
-            uM.VG.AddGridForce(VGMouse, 3, 2, rippleColor, false);
-            // foreach (Collider2D tgt in targets)
-            // {
-            //     GameObject go = tgt.gameObject;
-            //     if (go.tag == "Clone")
-            //     {
-            //         go.GetComponent<PlayerCopy>().rallied = true;
-            //     }
-            // }
+            uM.VG.AddGridForce(VGMouse, 3, 2, playerColor.Value, false);
         }
 
         VGPos = rb.position;
         VGPos.z = uM.VGZ;
-        uM.VG.AddGridForce(VGPos, 5, maxHp * 1.2f, uM.color1, true);
+        uM.VG.AddGridForce(VGPos, 5, maxHp * 1.4f, playerColor.Value, true);
 
         if (colliders != null)
             foreach (Collider2D hit in colliders)
@@ -438,9 +555,9 @@ public class PlayerController : NetworkBehaviour
                         Vector3 colVec = new Vector3(
                             colTransform.position.x,
                             colTransform.position.y,
-                            shield.transform.position.z
+                            VGShield.transform.position.z
                         );
-                        shield.AddGridForce(colVec, 1f, .3f, Color.red, false);
+                        VGShield.AddGridForce(colVec, 1f, .3f, Color.red, false);
                     }
                 }
             }
@@ -449,8 +566,7 @@ public class PlayerController : NetworkBehaviour
     void LateUpdate()
     {
 
-        if(!IsOwner) return;
-        shield.transform.rotation = Quaternion.Euler(
+        VGShield.transform.rotation = Quaternion.Euler(
             0.0f,
             0.0f,
             gameObject.transform.rotation.z * -1.0f
@@ -458,15 +574,18 @@ public class PlayerController : NetworkBehaviour
     }
 }
 
-    struct PlayerData : INetworkSerializable
+struct PlayerData : INetworkSerializable
+{
+    public ulong id;
+    public ushort Length;
+
+    public void NetworkSerialize<T>(BufferSerializer<T> serializer)
+        where T : IReaderWriter
     {
-        public ulong id;
-        public ushort Length;
-        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter {
-            serializer.SerializeValue(ref id);
-            serializer.SerializeValue(ref Length);
-        }
+        serializer.SerializeValue(ref id);
+        serializer.SerializeValue(ref Length);
     }
+}
 
 
 

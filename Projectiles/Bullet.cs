@@ -1,82 +1,90 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Netcode;
 
-public class Bullet : MonoBehaviour
+public class Bullet : NetworkBehaviour
 {
     private float expiration = 0;
+    public GameObject prefab;
+    private UM uM;
+    public bool boosted = false;
+    public Rigidbody2D rb;
+    private Transform rbTransform;
 
-    // Start is called before the first frame update
-    // void Start()
-    // {
-
-    // }
-
-    // void OnEnable()
-    // {
-    //     if (this.gameObject.tag == "Bullet")
-    //     {
-    // GameObject player =
-    // Physics2D.IgnoreCollision(
-    //     GameObject.FindGameObjectWithTag("Player").GetComponent<Collider2D>(),
-    //     GetComponent<Collider2D>()
-    // );
-
-    // GameObject[] allies = GameObject.FindGameObjectsWithTag("Clone");
-    // foreach (GameObject obj in allies)
-    // {
-    //     Physics2D.IgnoreCollision(
-    //         obj.GetComponent<Collider2D>(),
-    //         GetComponent<Collider2D>()
-    //     );
-    // }
-    // }
-    // if (this.gameObject.tag == "EnemyBullet")
-    // {
-    //     GameObject[] allies = GameObject.FindGameObjectsWithTag("BasicEnemy");
-    //     foreach (GameObject obj in allies)
-    //     {
-    //         Physics2D.IgnoreCollision(
-    //             obj.GetComponent<Collider2D>(),
-    //             GetComponent<Collider2D>()
-    //         );
-    //     }
-    // }
-    // }
-
-    // private void OnBecameInvisible()
-    // {
-    //     gameObject.SetActive(false);
-    // }
-    private void OnCollisionEnter2D(Collision2D col)
+    void Start()
     {
-        if (this.gameObject.tag == "Bullet")
-        {
-            if (col.gameObject.tag == "EnemyBasic")
-                gameObject.SetActive(false);
-            // if(col.gameObject.tag == "Clone"){
-            //         gameObject.SetActive(false);
-
-            // }
-        }
-        if (this.gameObject.tag == "EnemyBullet")
-        {
-            if (col.gameObject.tag == "Clone")
-                gameObject.SetActive(false);
-        }
-        if (this.gameObject.tag != col.gameObject.tag)
-            gameObject.SetActive(false);
+        rbTransform = rb.transform;
+        uM = UM.Instance;
     }
 
-    private void OnCollissionExit2D(Collision2D col) { }
-
-    void Update()
+    void OnEnable()
     {
-        expiration += Time.deltaTime;
-        if (expiration > 3)
+        boosted = false;
+    }
+
+    private void OnCollisionEnter2D(Collision2D col)
+    {
+        // if (this.gameObject.tag == "Bullet")
+        // {
+        //     if (col.gameObject.tag == "EnemyBasic")
+        //         despawnClientRpc();
+        // NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        //     // if(col.gameObject.tag == "Clone"){
+        //     //         gameObject.SetActive(false);
+
+        //     // }
+        // }
+        // if (this.gameObject.tag == "EnemyBullet")
+        // {
+        //     if (col.gameObject.tag == "Clone")
+        //         despawnClientRpc();
+        // NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        // }
+    if (NetworkObject.IsSpawned)
+        despawnServerRpc();
+        // despawnClientRpc();
+    }
+
+    [ClientRpc]
+    public void despawnClientRpc()
+    {
+        NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        if (NetworkObject.IsSpawned)
+            NetworkObject.Despawn();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void despawnServerRpc()
+    {
+        if (NetworkObject.IsSpawned)
+            NetworkObject.Despawn();
+        NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        despawnClientRpc();
+    }
+
+    // void Update(){
+    //     transform.Translate(rbTransform.up * Time.deltaTime * 50);
+    // }
+    void FixedUpdate()
+    {
+        if (!boosted)
         {
-            gameObject.SetActive(false);
+            // rb.AddForce(rb.transform.up * 2000);
+            boosted = true;
+        }
+
+        if (rbTransform.position.z != -1)
+        {
+            rbTransform.position = new Vector3(rbTransform.position.x, rbTransform.position.y, -1);
+        }
+        expiration += Time.deltaTime;
+        if (expiration > 5)
+        {
             expiration = 0;
+
+            //  despawnClientRpc();
+            despawnServerRpc();
         }
     }
 }

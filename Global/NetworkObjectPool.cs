@@ -5,12 +5,6 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Assertions;
 
-/// <summary>
-/// Object Pool for networked objects, used for controlling how objects are spawned by Netcode. Netcode by default will allocate new memory when spawning new
-/// objects. With this Networked Pool, we're using custom spawning to reuse objects.
-/// Boss Room uses this for projectiles. In theory it should use this for imps too, but we wanted to show vanilla spawning vs pooled spawning.
-/// Hooks to NetworkManager's prefab handler to intercept object spawning and do custom actions
-/// </summary>
 public class NetworkObjectPool : NetworkBehaviour
 {
     public static NetworkObjectPool _instance;
@@ -29,7 +23,7 @@ public class NetworkObjectPool : NetworkBehaviour
         new Dictionary<GameObject, Queue<NetworkObject>>();
     Dictionary<GameObject, int> nonPooledObjects =
         new Dictionary<GameObject, int>();
-    private bool m_HasInitialized = false;
+    bool m_HasInitialized = false;
 
     public void Awake()
     {
@@ -97,8 +91,18 @@ public class NetworkObjectPool : NetworkBehaviour
     {
         var go = networkObject.gameObject;
         go.SetActive(false);
-        pooledObjects[prefab].Enqueue(networkObject);
+       if (pooledObjects.TryGetValue(prefab, out var queue))
+    {
+        queue.Enqueue(networkObject);
         nonPooledObjects[prefab]--;
+        
+    }
+            else
+    {
+        // Debug.LogError($"Key not found in dictionary: {prefab.name}");
+    }
+  
+    
     }
     public int GetCurrentPrefabCount(GameObject prefab) {
         return nonPooledObjects[prefab];

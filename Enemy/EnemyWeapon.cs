@@ -1,12 +1,17 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
-public class EnemyWeapon : MonoBehaviour
+using Unity.Netcode;
+using UnityEngine.Networking;
+public class EnemyWeapon : NetworkBehaviour
 {
     public GameObject bulletPrefab;
     public Transform firePoint;
     public float fireForce = 120f;
+    public EnemyBasic parent;
+public GameObject fireTarget;
+public GameObject missilePrefab;
+
 
     // public GameObject sparkPrefab;
     void Start()
@@ -33,19 +38,19 @@ public class EnemyWeapon : MonoBehaviour
         // Object.Destroy(this.gameObject, 1);
     }
 
-    public void FireEM(Vector3 fireTarget)
+    [ServerRpc(RequireOwnership=false)]
+    public void FireMissileServerRpc()
     {
-        GameObject missile = ObjectPool.SharedInstance.GetEM();
-        if (missile != null)
-        {
-            missile.transform.position = firePoint.position;
-            missile.transform.rotation = transform.rotation;
-
-            missile.GetComponent<Missile>().SetTarget(fireTarget);
-
-            missile.SetActive(true);
-            missile.GetComponent<Rigidbody2D>().velocity += (Vector2)(firePoint.up * 100);
-            //  missile.GetComponent<Rigidbody2D>().AddForce(firePoint.up * 1000);
-        }
+        
+        // if (!IsOwner)
+        //     return;
+    //           if(!NetworkManager.Singleton.IsServer) return;
+    // UM.Instance.spawnMissileServerRpc(transform.position, transform.rotation);
+      
+    //    Missile netMissileC = netMissile.GetComponent<Missile>();
+    //    netMissileC.SetPlayerTarget(fireTarget);
+    //     netMissileC.prefab = missilePrefab;
+    //     if(!netMissile.IsSpawned) netMissile.Spawn(true);
+    //      netMissile.GetComponent<Rigidbody2D>().AddForce(firePoint.up * 6000);
     }
 }

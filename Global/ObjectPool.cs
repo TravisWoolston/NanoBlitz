@@ -32,35 +32,35 @@ public class ObjectPool : MonoBehaviour
         unitManager = UM.Instance;
         bullets = new List<GameObject>();
         GameObject tmp;
-        for (int i = 0; i < amountToPool; i++)
-        {
-            tmp = Instantiate(enemyCptPrefab);
-            tmp.SetActive(false);
-            enemyCpts.Add(tmp);
-        }
-        for (int i = 0; i < amountToPool; i++)
-        {
-            tmp = Instantiate(missilePrefab);
-            tmp.SetActive(false);
-            missiles.Add(tmp);
-        }
-        for (int i = 0; i < amountToPool; i++)
-        {
-            tmp = Instantiate(enemyMPF);
-            tmp.SetActive(false);
-            enemyMissiles.Add(tmp);
-        }
-        {
-            tmp = Instantiate(missilePrefab);
-            tmp.SetActive(false);
-            enemyCpts.Add(tmp);
-        }
-        for (int i = 0; i < amountToPool; i++)
-        {
-            tmp = Instantiate(basicAllyPrefab);
-            tmp.SetActive(false);
-            basicAllies.Add(tmp);
-        }
+        // for (int i = 0; i < amountToPool; i++)
+        // {
+        //     tmp = Instantiate(enemyCptPrefab);
+        //     tmp.SetActive(false);
+        //     enemyCpts.Add(tmp);
+        // }
+        // for (int i = 0; i < amountToPool; i++)
+        // {
+        //     tmp = Instantiate(missilePrefab);
+        //     tmp.SetActive(false);
+        //     missiles.Add(tmp);
+        // }
+        // for (int i = 0; i < amountToPool; i++)
+        // {
+        //     tmp = Instantiate(enemyMPF);
+        //     tmp.SetActive(false);
+        //     enemyMissiles.Add(tmp);
+        // }
+        // {
+        //     tmp = Instantiate(missilePrefab);
+        //     tmp.SetActive(false);
+        //     enemyCpts.Add(tmp);
+        // }
+        // for (int i = 0; i < amountToPool; i++)
+        // {
+        //     tmp = Instantiate(basicAllyPrefab);
+        //     tmp.SetActive(false);
+        //     basicAllies.Add(tmp);
+        // }
         for (int i = 0; i < amountToPool; i++)
         {
             tmp = Instantiate(bulletPrefab);
@@ -119,54 +119,54 @@ public class ObjectPool : MonoBehaviour
         return null;
     }
 
-    public GameObject GetBasicEnemy()
-    {
-        for (int i = 0; i < amountToPool; i++)
-        {
-            if (!basicEnemies[i].activeInHierarchy)
-            {
-                unitManager.NewAI();
-                return basicEnemies[i];
-            }
-        }
-        return null;
-    }
+    // public GameObject GetBasicEnemy()
+    // {
+    //     for (int i = 0; i < amountToPool; i++)
+    //     {
+    //         if (!basicEnemies[i].activeInHierarchy)
+    //         {
+    //             unitManager.NewAI();
+    //             return basicEnemies[i];
+    //         }
+    //     }
+    //     return null;
+    // }
 
-    public GameObject GetBasicAlly()
-    {
-        for (int i = 0; i < amountToPool; i++)
-        {
-            if (!basicAllies[i].activeInHierarchy)
-            {
-                return basicAllies[i];
-            }
-        }
-        return null;
-    }
+    // public GameObject GetBasicAlly()
+    // {
+    //     for (int i = 0; i < amountToPool; i++)
+    //     {
+    //         if (!basicAllies[i].activeInHierarchy)
+    //         {
+    //             return basicAllies[i];
+    //         }
+    //     }
+    //     return null;
+    // }
 
-    public GameObject GetEnemyCpt()
-    {
-        for (int i = 0; i < amountToPool; i++)
-        {
-            if (!enemyCpts[i].activeInHierarchy)
-            {
-                return enemyCpts[i];
-            }
-        }
-        return null;
-    }
+    // public GameObject GetEnemyCpt()
+    // {
+    //     for (int i = 0; i < amountToPool; i++)
+    //     {
+    //         if (!enemyCpts[i].activeInHierarchy)
+    //         {
+    //             return enemyCpts[i];
+    //         }
+    //     }
+    //     return null;
+    // }
 
-    public GameObject GetMissile()
-    {
-        for (int i = 0; i < amountToPool; i++)
-        {
-            if (!missiles[i].activeInHierarchy)
-            {
-                return missiles[i];
-            }
-        }
-        return null;
-    }
+    // public GameObject GetMissile()
+    // {
+    //     for (int i = 0; i < amountToPool; i++)
+    //     {
+    //         if (!missiles[i].activeInHierarchy)
+    //         {
+    //             return missiles[i];
+    //         }
+    //     }
+    //     return null;
+    // }
 
     public GameObject GetEM()
     {

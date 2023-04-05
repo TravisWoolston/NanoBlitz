@@ -2,9 +2,10 @@ using System.Collections;
 using System.Collections.Generic;
 using Pathfinding;
 using UnityEngine;
-using UnityEngine.AI;
+
 using Unity.Netcode;
 using UnityEngine.Networking;
+
 public class EnemyBasic : NetworkBehaviour
 {
     public GameObject player;
@@ -21,13 +22,13 @@ public class EnemyBasic : NetworkBehaviour
     Vector3 positionWithMostAllies;
     Vector2 moveDirection;
     public Vector2 target;
-    Vector2 DSTarget;
-    Vector2 fireTarget;
+
+    public Vector2 fireTarget;
     Vector2 mousePosition;
     Vector3 playerPosition;
     public float timer = 0.0f;
-    public float hp = 0;
-    private float hpCheck = 0;
+    public float hp = 1;
+    private float hpCheck = 1;
     public GameObject[] playerAllies;
     private float dmgRate = .05f;
     private bool isCaptain = false;
@@ -47,7 +48,7 @@ public class EnemyBasic : NetworkBehaviour
     private bool queUpdate = false;
     float AIQueLength = 0;
     float lastRemoved = 0;
-    public Transform closestPlayerAlly;
+    public GameObject closestPlayerObject;
     float distanceThreshold = 50f;
     bool relocating = false;
     float fireRange = 100;
@@ -58,8 +59,7 @@ public class EnemyBasic : NetworkBehaviour
     private float fireRate;
     private GameObject closestAllyObject;
     float rotationSpeed = 2f;
-    public AIDestinationSetter DS;
-    public AIPath aIPath;
+
     Path path;
     public float nextWaypointDistance = 8f;
     int currentWaypoint = 0;
@@ -87,8 +87,16 @@ public class EnemyBasic : NetworkBehaviour
     float allySearchRadius = 10;
     public GameObject rallyCpt;
     Transform cptTransform;
-    Vector2 velocity;
+    public Vector2 velocity;
     public GameObject prefab;
+    public Transform firePoint;
+  public override void OnNetworkSpawn() {
+
+                 uM = UM.Instance;
+        
+        // rallied = false;
+        hp = 1;
+       }
     void Start()
     {
         uM = UM.Instance;
@@ -97,7 +105,7 @@ public class EnemyBasic : NetworkBehaviour
         // playerC = player.GetComponent<PlayerController>();
         VGZ = uM.VGZ;
         playerAllies = uM.allyArray;
-        gridGraph = AstarPath.active.data.gridGraph;
+
         if (this.gameObject.tag == "EnemyCaptain")
         {
             VGRadius = 5;
@@ -109,8 +117,8 @@ public class EnemyBasic : NetworkBehaviour
             isCaptain = true;
             fireRate = 2;
             rotationSpeed = .5f;
-            InvokeRepeating("UpdateBounds", 0f, 1f);
-            InvokeRepeating("UpdateCaptainTarget", 0f, 2f);
+
+            InvokeRepeating("UpdateCaptainTarget", .1f, 2f);
             fireRange = 100;
         }
         else
@@ -121,30 +129,29 @@ public class EnemyBasic : NetworkBehaviour
             rb.mass = 50;
             fireRate = .3f;
             seeker = GetComponent<Seeker>();
-            InvokeRepeating("UpdatePath", 0f, 1f);
-            InvokeRepeating("UpdateBounds", 0f, 5f);
 
-            DS = GetComponent<AIDestinationSetter>();
+
             engine = Instantiate(engineParticles, exhaustPoint);
             bulletAudio.pitch = Random.Range(.9f, 1.1f);
-            InvokeRepeating("UpdateTarget", 0f, .7f);
+            InvokeRepeating("UpdateTarget", .1f, .7f);
         }
         InvokeRepeating("UpdateAllyArrays", 0f, 1f);
-        thrustPower = rb.mass * 100;
+        thrustPower = rb.mass * 10;
         rbTransform = rb.transform;
         sprite = this.GetComponent<SpriteRenderer>();
         sprite.color = new Color(1, 0, 0);
         color = sprite.color;
-        // enemies = uM.enemies;
+        weapon.parent = this;
     }
 
     void OnEnable()
     {
-        //         if (uM.playerArray.Length > 0){
-        //  player = uM.GetClosestPlayerGameObject(rbTransform.position);
-        //         playerT = player.transform;
-        //         playerC = player.GetComponent<PlayerController>();
-        //         }
+        uM = UM.Instance;
+                if (uM.playerArray.Length > 0){
+         player = uM.GetClosestPlayerGameObject(transform.position);
+                playerT = player.transform;
+                playerC = player.GetComponent<PlayerController>();
+                }
 
         if (!isCaptain)
         {
@@ -164,20 +171,8 @@ public class EnemyBasic : NetworkBehaviour
         );
     }
 
-    void UpdateBounds()
-    {
-        Bounds bounds = GetComponent<Collider2D>().bounds;
-        AstarPath.active.UpdateGraphs(bounds, 2f);
-    }
 
-    void UpdatePath()
-    {
-        if (seeker.IsDone() || pathTimer > 10)
-        {
-            pathTimer = 0;
-            seeker.StartPath(transform.position, target, OnPathComplete);
-        }
-    }
+ 
 
     void OnPathComplete(Path p)
     {
@@ -192,7 +187,7 @@ public class EnemyBasic : NetworkBehaviour
     {
         if (collision.gameObject.tag == "Bullet")
         {
-            hp += dmgRate;
+            hp -= dmgRate;
         }
     }
 
@@ -230,43 +225,39 @@ public class EnemyBasic : NetworkBehaviour
         return filteredEnemies.ToArray();
     }
 
-    IEnumerator DelayedDisable()
+    public void Despawn()
     {
-        
-        yield return new WaitForSeconds(0f);
         if (gameObject.tag == "EnemyCaptain")
         {
             for (int i = 0; i < 5; i++)
             {
-                uM.spawnCloneServerRpc(basicAllyPrefab, transform);
+                uM.spawnCloneServerRpc(transform.position, transform.rotation);
             }
         }
         else
         {
-            uM.spawnCloneServerRpc(basicAllyPrefab, transform);
-            
+            uM.spawnCloneServerRpc( transform.position, transform.rotation);
         }
 
-        hp = 0;
+        despawnServerRpc();
 
-        // ParticleSystem spark = Instantiate(sparks, this.transform.position, Quaternion.identity);
-        // Destroy(spark, 2f);
-        Bounds bounds = GetComponent<Collider2D>().bounds;
-
-        GridGraph graph = AstarPath.active.graphs[0] as GridGraph;
-        // uM.AddGridForce(transform.position, 30, Color.red);
-        // uM.Explosion(transform);
-        UpdateBounds();
-        GraphUpdateObject guo = new GraphUpdateObject(bounds);
-        guo.modifyTag = true;
-        guo.setTag = 0; // set the tag to the default value to mark the nodes as walkable
-
-        AstarPath.active.UpdateGraphs(guo);
-         NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
-        // gameObject.SetActive(false);
-        
+    }
+ [ClientRpc]
+    public void despawnClientRpc()
+    {
+        NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        if (NetworkObject.IsSpawned)
+            NetworkObject.Despawn();
     }
 
+    [ServerRpc(RequireOwnership = false)]
+    public void despawnServerRpc()
+    {
+        if (NetworkObject.IsSpawned)
+            NetworkObject.Despawn();
+        NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        despawnClientRpc();
+    }
     GameObject GetClosestGameObject(GameObject[] gameObjects, Vector3 position)
     {
         float distance = Mathf.Infinity;
@@ -331,10 +322,11 @@ public class EnemyBasic : NetworkBehaviour
         captains = uM.captains;
         playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
         playerPosition = playerC.position;
-        closestPlayerAlly = GetClosestTransform(playerAllies, transform.position);
+        closestPlayerObject = GetClosestGameObject(playerAllies, transform.position);
 
         // Count the number of player allies within a certain radius of each position
         Dictionary<Vector3, int> allyCountByPosition = new Dictionary<Vector3, int>();
+       if(playerAlliesT.Length > 0)
         foreach (Transform ally in playerAlliesT)
         {
             Vector3 allyPos = ally.position;
@@ -364,13 +356,13 @@ public class EnemyBasic : NetworkBehaviour
             }
         }
 
-        if (closestPlayerAlly == null)
+        if (closestPlayerObject == null)
         {
             target = playerPosition;
         }
         else
         {
-            target = closestPlayerAlly.position;
+            target = closestPlayerObject.transform.position;
             fireTarget = positionWithMostAllies; // Set fireTarget to position with most allies
         }
         Vector2 fireDirection = fireTarget - rb.position;
@@ -378,22 +370,25 @@ public class EnemyBasic : NetworkBehaviour
         float dot = Vector3.Dot(transform.up, fireDirection.normalized);
         if (timer > fireRate && dot > .5 && playerAllies.Length > 0 && isCaptain)
         {
+            fireTarget = positionWithMostAllies;
             closestAllyObject = GetClosestGameObject(playerAllies, transform.position);
-            weapon.FireEM(positionWithMostAllies);
+            uM.spawnEM(firePoint.position, transform.rotation, NetworkObject);
             timer = 0;
         }
     }
 
     void UpdateTarget()
     {
-        if (player == null) return;
+        
+        if (player == null)
+            return;
         captains = uM.captains;
 
         playerPosition = playerC.position;
         playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
-        closestPlayerAlly = GetClosestTransform(playerAllies, transform.position);
+        closestPlayerObject = GetClosestGameObject(playerAllies, transform.position);
 
-        if (captains.Length > 0 && !rallied && !isCaptain)
+        if (captains.Length > 0 && !rallied)
         {
             float playerDistance = ((Vector3)playerPosition - transform.position).sqrMagnitude;
             if (closestCaptain == null || !closestCaptain.activeSelf)
@@ -424,29 +419,30 @@ public class EnemyBasic : NetworkBehaviour
             else
             {
                 target = closestCaptainT.position;
-                DS.target = closestCaptainT;
-                if (closestPlayerAlly != null)
+
+                if (closestPlayerObject != null)
                 {
-                    fireTarget = closestPlayerAlly.position;
+                    fireTarget = closestPlayerObject.transform.position;
                 }
             }
         }
         else
         {
-            if (closestPlayerAlly == null)
+            if (closestPlayerObject == null)
             {
                 target = playerPosition;
             }
             else
             {
-                target = closestPlayerAlly.position;
-                fireTarget = closestPlayerAlly.position;
+                target = closestPlayerObject.transform.position;
+                fireTarget = closestPlayerObject.transform.position;
             }
         }
     }
 
     void FixedUpdate()
     {
+if(!NetworkManager.Singleton.IsServer) return;
         if (player == null && uM.playerArray.Length > 0)
         {
             player = uM.GetClosestPlayerGameObject(gameObject.transform.position);
@@ -454,15 +450,16 @@ public class EnemyBasic : NetworkBehaviour
             playerT = player.transform;
             playerC = player.GetComponent<PlayerController>();
         }
-    
+
         velocity = rb.velocity;
         if (Dissolve.dissolveDone)
         {
-            StartCoroutine(DelayedDisable());
+            Despawn();
         }
-        if (hp > 1)
+        if (hp < 0)
         {
             Dissolve.isDissolving = true;
+            
         }
         pathTimer += Time.deltaTime;
         fireRange = (100f + uM.allies);
@@ -475,10 +472,10 @@ public class EnemyBasic : NetworkBehaviour
                     currentWaypoint = 0;
                     return;
                 }
-                if (path.vectorPath.Count > 2 && rallied)
-                    aIPath.canMove = true;
-                else
-                    aIPath.canMove = false;
+                // if (path.vectorPath.Count > 2 && rallied)
+                // aIPath.canMove = true;
+                // else
+                // aIPath.canMove = false;
                 float nextDistance = Vector2.Distance(
                     rb.position,
                     path.vectorPath[currentWaypoint]
@@ -497,33 +494,15 @@ public class EnemyBasic : NetworkBehaviour
         if (hp != hpCheck)
         {
             hpCheck = hp;
-            sprite.color = new Color(255, hp, 0);
+            // sprite.color = new Color(255, hp, 0);
         }
         GameObject closest = null;
         float distance = Mathf.Infinity;
         Vector3 position = transform.position;
 
-        if (!isCaptain && path != null)
-        {
-            if (path.vectorPath != null)
-            {
-                if (path.vectorPath != null)
-                {
-                    if (currentWaypoint >= path.vectorPath.Count)
-                    {
-                        currentWaypoint = 0;
-                    }
-                    goTo = path.vectorPath[currentWaypoint];
-                }
-            }
-        }
-        else
-        {
-            goTo = target;
-        }
         timer += Time.deltaTime;
         var offset = 90f;
-        Vector2 targetDirection = goTo - rb.position;
+        Vector2 targetDirection = target - rb.position;
         targetDirection.Normalize();
         float targetAngle = Mathf.Atan2(targetDirection.y, targetDirection.x) * Mathf.Rad2Deg;
 
@@ -558,13 +537,24 @@ public class EnemyBasic : NetworkBehaviour
             {
                 if (rallied)
                 {
-                    if (Vector2.Distance(rb.position, cptTransform.position) > distanceThreshold)
+                    if (Vector2.Distance(rb.position, cptTransform.position) < distanceThreshold)
                     {
                         rb.velocity = rallyCpt.GetComponent<Rigidbody2D>().velocity;
                     }
+                    else
+                    {
+                        rb.AddForce(Accelerator(rbTransform.up) * (thrustPower));
+                    }
                 }
+                else if (isCaptain)
+                    rb.AddForce(
+                        Accelerator(rbTransform.up)
+                            * (thrustPower * Vector2.Distance(target, rb.position) / 10)
+                    );
                 else
-                    rb.AddForce(Accelerator(rbTransform.up) * thrustPower);
+                {
+                    rb.AddForce(Accelerator(rbTransform.up) * (thrustPower));
+                }
             }
             else
             {
@@ -587,14 +577,16 @@ public class EnemyBasic : NetworkBehaviour
             bulletAudio.clip = lasers[index];
             bulletAudio.pitch = Random.Range(.9f, 1.1f);
             bulletAudio.Play();
-            weapon.Fire();
+            uM.spawnEnemyBulletServerRpc(firePoint.position, transform.rotation);
             timer = 0;
         }
     }
 
     void Update()
     {
-        if(uM.playerArray.Length == 0) return;
+        if(!IsServer) return;
+        if (uM.playerArray.Length == 0)
+            return;
         magnitude = rb.velocity.magnitude;
 
         if (magnitude > 30)

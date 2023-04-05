@@ -4,8 +4,7 @@ using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
-
-public class NetworkManagerUI : MonoBehaviour
+public class NetworkManagerUI : NetworkBehaviour
 {
     [SerializeField]
     private Button serverBtn;
@@ -15,9 +14,17 @@ public class NetworkManagerUI : MonoBehaviour
 
     [SerializeField]
     private Button clientBtn;
+    [SerializeField]
+    private Button localHostBtn;
+    [SerializeField]
+    private Button localJoinBtn;
+    [SerializeField]
+    private InputField serverKeyInput;
+
 
     private void Awake()
     {
+        serverKeyInput.text = "Enter Key";
         serverBtn.onClick.AddListener(() =>
         {
             NetworkManager.Singleton.StartServer();
@@ -25,13 +32,28 @@ public class NetworkManagerUI : MonoBehaviour
         });
         hostBtn.onClick.AddListener(() =>
         {
+             GetComponent<ServerRelay>().CreateRelay();
+            // NetworkManager.Singleton.StartHost();
+            NetworkObjectPool.Singleton.InitializePool();
+            // NetworkManager.Singleton.SceneManager.LoadScene("Overworld", LoadSceneMode.Single);
+        });
+
+        clientBtn.onClick.AddListener(() =>
+        {
+            GetComponent<ServerRelay>().JoinRelay();
+            // NetworkManager.Singleton.StartClient();
+            NetworkObjectPool.Singleton.InitializePool();
+        });
+                localHostBtn.onClick.AddListener(() =>
+        {
+            //  GetComponent<ServerRelay>().CreateRelay();
             NetworkManager.Singleton.StartHost();
             NetworkObjectPool.Singleton.InitializePool();
             // NetworkManager.Singleton.SceneManager.LoadScene("Overworld", LoadSceneMode.Single);
         });
-        clientBtn.onClick.AddListener(() =>
+        localJoinBtn.onClick.AddListener(() =>
         {
-
+            // GetComponent<ServerRelay>().JoinRelay();
             NetworkManager.Singleton.StartClient();
             NetworkObjectPool.Singleton.InitializePool();
         });

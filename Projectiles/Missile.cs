@@ -2,13 +2,14 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Unity.Netcode;
+
 public class Missile : NetworkBehaviour
 {
-    
-       public override void OnNetworkSpawn() {
-         
-        if(!IsOwner) return;
-       }
+    public override void OnNetworkSpawn()
+    {
+        rbTransform = transform;
+    }
+
     public Weapon parent;
     private float maxSpeed = 1000f;
     private float moveSpeed = 20f;
@@ -21,7 +22,7 @@ public class Missile : NetworkBehaviour
     public Rigidbody2D rb;
     public GameObject engineParticles;
     public Transform exhaustPoint;
-    GameObject engine;
+
     public Quaternion targetRotation;
     private float offset = 90f;
     Vector2 moveDirection;
@@ -37,9 +38,12 @@ public class Missile : NetworkBehaviour
     private float distance;
     public AudioSource rocketBoostSFX;
     public AudioClip[] rocketSounds;
+    private Transform rbTransform;
     UM uM;
     Color rippleColor = Color.blue;
     public GameObject prefab;
+    private bool boosted = false;
+    float thrustPower;
 
     //     public AudioSource explosionSFX;
     //     private AudioClip exp;
@@ -48,11 +52,18 @@ public class Missile : NetworkBehaviour
     void Start()
     {
         uM = UM.Instance;
-        rb.angularDrag = 100;
-        rb.drag = 1f;
+        if (gameObject.tag == "Missile")
+        {
+            engineParticles.GetComponent<ParticleSystem>().startColor = Color.blue;
+            // targetGameObject = uM.fireTarget;
+            rippleColor = Color.blue;
+        }
+        rbTransform = transform;
+        rb.angularDrag = 1;
+        rb.drag = 2f;
         rb.mass = 1000;
+        thrustPower = rb.mass * 20;
         rb.gravityScale = 1;
-        engine = Instantiate(engineParticles, exhaustPoint);
 
         // InvokeRepeating("StartAudio", 0f, 3f);
     }
@@ -60,6 +71,7 @@ public class Missile : NetworkBehaviour
     // void Awake() {
     //     DontDestroyOnLoad(gameObject);
     // }
+
     void OnEnable()
     {
         uM = UM.Instance;
@@ -74,6 +86,7 @@ public class Missile : NetworkBehaviour
 
         if (gameObject.tag == "Missile")
         {
+            engineParticles.GetComponent<ParticleSystem>().startColor = Color.blue;
             // targetGameObject = uM.fireTarget;
             rippleColor = Color.blue;
         }
@@ -88,7 +101,7 @@ public class Missile : NetworkBehaviour
         // targetGameObject = EMTarget;
         target = EMTarget;
     }
-    
+
     public void SetPlayerTarget(GameObject MTarget)
     {
         // targetGameObject = EMTarget;
@@ -106,7 +119,7 @@ public class Missile : NetworkBehaviour
             {
                 Explode();
                 timer = 0;
-              // uM.despawnServerObject(prefab, NetworkObject);
+                // uM.despawnServerObject(prefab, NetworkObject);
             }
         }
         else
@@ -126,7 +139,7 @@ public class Missile : NetworkBehaviour
         if (gameObject.tag == "Missile")
         {
             float effectMod = 1;
-            
+
             foreach (Collider2D hit in colliders)
             {
                 bool contact = false;
@@ -136,7 +149,8 @@ public class Missile : NetworkBehaviour
                     Vector2 direction = rb.transform.position - transform.position;
                     float distance = direction.magnitude;
                     float effect = (1 - (distance / explosionRadius)) * effectMod;
-                    if (effect<0){
+                    if (effect < 0)
+                    {
                         effect = 0;
                     }
                     Vector2 force = direction.normalized * explosionForce * effect;
@@ -144,26 +158,27 @@ public class Missile : NetworkBehaviour
                     if (hit.tag == "BasicEnemy")
                     {
                         contact = true;
-                        rb.gameObject.GetComponent<EnemyBasic>().hp += effect * .4f;
+                        rb.gameObject.GetComponent<EnemyBasic>().hp -= effect * .4f;
                         // rb.AddForce(force, ForceMode2D.Impulse);
                         rb.AddForce(force * rb.mass * 50);
-
                     }
                     if (hit.tag == "EnemyCaptain")
                     {
                         contact = true;
-                        rb.gameObject.GetComponent<EnemyBasic>().hp += effect * .2f;
+                        rb.gameObject.GetComponent<EnemyBasic>().hp -= effect * .2f;
                     }
-                     if(contact){
-                    if (effectMod > 0){
-                        effectMod -= .1f;
-                    }
-                    else {
-                        effectMod = .1f;
+                    if (contact)
+                    {
+                        if (effectMod > 0)
+                        {
+                            effectMod -= .1f;
+                        }
+                        else
+                        {
+                            effectMod = .1f;
+                        }
                     }
                 }
-                }
-               
             }
         }
         else
@@ -195,14 +210,21 @@ public class Missile : NetworkBehaviour
                         rb.AddForce(force * rb.mass * 50);
                     }
                 }
-                   if(contact){
-                    if (effectMod > 0){
+                if (contact)
+                {
+                    if (effectMod > 0)
+                    {
                         effectMod -= .1f;
                     }
-                    else {
+                    else
+                    {
                         effectMod = .1f;
                     }
-                   }
+                    if (effectMod > 0)
+                    {
+                        effectMod = 0;
+                    }
+                }
             }
         }
 
@@ -211,24 +233,64 @@ public class Missile : NetworkBehaviour
         uM.AddGridForce(transform.position, -5, 8, rippleColor, true);
         uM.Explosion(transform);
 
-        uM.despawnServerObject(prefab, NetworkObject);
+        // uM.despawn(prefab);
+
+        if (!IsServer)
+            return;
+        boosted = false;
+        // despawnServerRpc();
+if (NetworkObject.IsSpawned)
+        despawnServerRpc();
+        
+    }
+
+    [ClientRpc]
+    public void despawnClientRpc()
+    {
+        NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        if (NetworkObject.IsSpawned)
+            NetworkObject.Despawn();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void despawnServerRpc()
+    {
+        if (NetworkObject.IsSpawned)
+            NetworkObject.Despawn();
+        NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        despawnClientRpc();
     }
 
     Vector3 Accelerator()
     {
-        moveDirection = rb.transform.up;
-        accTimerBase += Time.deltaTime;
-        accTimer = accTimerBase * Time.deltaTime * 10;
+        if (accTimer < 5)
+        {
+            accTimer += Time.deltaTime;
+        }
+        if (accTimer < 2)
+        {
+            accTimer++;
+        }
         float targetSpeed = moveSpeed * accTimer;
         float clampedSpeed = Mathf.Clamp(targetSpeed, 0, maxSpeed);
         float smoothAccel = Mathf.SmoothStep(0, clampedSpeed, acceleration * Time.deltaTime);
 
-        return moveDirection * smoothAccel;
+        return transform.up * (smoothAccel / 5);
     }
 
     void FixedUpdate()
     {
-        
+        if (!IsOwner)
+            return;
+        if (!boosted)
+        {
+            rb.AddForce(Accelerator() * thrustPower * 10);
+            boosted = true;
+        }
+        if (rbTransform.position.z != -1)
+        {
+            rbTransform.position = new Vector3(rbTransform.position.x, rbTransform.position.y, -1);
+        }
         timer += Time.deltaTime;
         if (timer > 8)
         {
@@ -236,16 +298,16 @@ public class Missile : NetworkBehaviour
             timer = 0;
             // uM.despawnServerObject(prefab, NetworkObject);
         }
-           
+
         // engine.transform.position = exhaustPoint.position;
-        if(IsOwner){
+
         if (targetGameObject != null && targetGameObject.activeInHierarchy)
         {
             target = targetGameObject.GetComponent<Rigidbody2D>().transform.position;
         }
         else
         {
-            if (gameObject.tag == "Missile")
+            if (gameObject.tag == "Missile" && UM.Instance.enemies.Length > 0)
             {
                 // targetGameObject = UM.Instance.GetClosestGameObject(
                 //     UM.Instance.enemies,
@@ -254,15 +316,12 @@ public class Missile : NetworkBehaviour
                 // if(targetGameObject == null){
                 //     targetGameObject = transform.parent.gameObject.GetComponent<Missile>().parent.fireTarget;
                 // }
-                target = 
-                 UM.Instance.GetClosestGameObject(
-                    UM.Instance.enemies,
-                    transform.position
-                ).transform.position;
+                target = uM
+                    .GetClosestGameObject(UM.Instance.enemies, transform.position)
+                    .transform.position;
             }
             // else Explode();
         }
-        
 
         distance = Vector2.Distance(rb.transform.position, target);
         if (rb.velocity.magnitude == 0)
@@ -271,7 +330,7 @@ public class Missile : NetworkBehaviour
         }
         else
             time = distance / rb.velocity.magnitude;
-        if (gameObject.tag != "EnemyMPF")
+        if (gameObject.tag != "EnemyMPF" && targetGameObject != null)
         {
             predictedTarget = target + targetGameObject.GetComponent<Rigidbody2D>().velocity * time;
         }
@@ -282,7 +341,7 @@ public class Missile : NetworkBehaviour
             //     predictedTarget = uM.position;
             // }
             // else
-            if (timer > 3)
+            if (timer > 6)
             {
                 predictedTarget = uM.allyArray[0].transform.position;
             }
@@ -296,22 +355,18 @@ public class Missile : NetworkBehaviour
 
         targetRotation = Quaternion.Euler(Vector3.forward * (targetAngle - offset));
         float ddot = Vector3.Dot(transform.up, targetDirection);
-        if (ddot > .8)
+        if (ddot > .7)
         {
-            rb.velocity = (Vector2)Accelerator();
+            rb.AddForce(Accelerator() * thrustPower / 3);
         }
-        else
+        if (ddot > .98)
         {
-            accTimerBase = accTimerBaseReset;
-            accTimer = accTimerBase;
-            float decel = Mathf.Lerp(1, 0, Mathf.Pow(rb.velocity.magnitude / maxSpeed, 20));
-            rb.velocity *= decel;
-        }
-        if (Quaternion.Angle(transform.rotation, targetRotation) > 0.1f)
-        {
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 3f);
+            rb.AddForce(Accelerator() * thrustPower / 2);
         }
 
+        if (transform.rotation != targetRotation)
+        {
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 100f);
+        }
     }
-}
 }
