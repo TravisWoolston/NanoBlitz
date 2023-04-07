@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.Networking;
+
 public class PlayerCopy : NetworkBehaviour
 {
     public GameObject player;
@@ -58,6 +59,7 @@ public class PlayerCopy : NetworkBehaviour
     Transform enemyRBTransform;
     public Dissolve Dissolve;
     public VectorGrid VGShield;
+
     // VectorGrid VGShield;
 
     bool activeShield = true;
@@ -66,20 +68,29 @@ public class PlayerCopy : NetworkBehaviour
     public GameObject prefab;
     public Transform firePoint;
     public int playerID;
-  
-       public override void OnNetworkSpawn() {
 
-                 uM = UM.Instance;
-       
+    void Awake()
+    {
+        uM = UM.Instance;
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        //  uM = UM.Instance;
+        player = uM.GetClosestPlayerGameObject(transform.position);
+        playerT = player.transform;
+        playerC = player.GetComponent<PlayerController>();
+        uM.UpdateTeams(playerC, gameObject);
         VGShieldTimer = 0;
         activeShield = true;
         // rallied = false;
         hp = 1;
-       }
+    }
+    public override void OnNetworkDespawn(){
+        uM.RemoveUpdateTeams(playerC, gameObject);
+    }
     void Start()
     {
-
-        uM = UM.Instance;
         // activeShield = true;
         // player = GameObject.FindGameObjectsWithTag("Player")[0];
         // playerT = player.transform;
@@ -87,6 +98,7 @@ public class PlayerCopy : NetworkBehaviour
         weapon.hasMissiles = false;
         VGZ = uM.VGZ;
         allies = uM.allies;
+        enemies = uM.enemies;
         sprite = this.GetComponent<SpriteRenderer>();
         sprite.color = new Color(1 - hp, 1 - hp, 1 - hp);
         color = Color.blue;
@@ -105,15 +117,11 @@ public class PlayerCopy : NetworkBehaviour
 
     void OnEnable()
     {
-
-        uM = UM.Instance;
-        enemies = GameObject.FindGameObjectsWithTag("BasicEnemy");
+        
         VGShieldTimer = 0;
         // activeShield = true;
         // rallied = false;
         hp = 1;
-
-            
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -122,11 +130,15 @@ public class PlayerCopy : NetworkBehaviour
         {
             hp -= .0314f;
         }
+        if(collision.gameObject.tag == "Bullet" ){
+            if(collision.gameObject.GetComponent<Bullet>().teamID != playerC.playerID.Value){
+                hp -= .0314f;
+            }
+        }
     }
 
     Vector3 Accelerator(Vector3 inputDirection)
     {
-       
         if (accTimer < 5)
         {
             accTimer += Time.deltaTime;
@@ -170,32 +182,23 @@ public class PlayerCopy : NetworkBehaviour
 
     void UpdateTarget()
     {
-
-        if(player == null) {
-            player = uM.GetClosestPlayerGameObject(rbTransform.position);
-             
-             playerT = player.transform;
-        playerC = player.GetComponent<PlayerController>();
-        }
         allies = uM.allies;
         distanceThreshold = playerC.distanceThreshold;
-        
+
         fireThreshold = (70f + allies) * playerC.hp;
-        enemies = GameObject.FindGameObjectsWithTag("BasicEnemy");
 
         distance = Mathf.Infinity;
         Vector3 position = transform.position;
-        closestBasicEnemy = uM.GetClosestEnemyGameObject(transform.position);
+        closestBasicEnemy = uM.GetClosestEnemyGameObjectDic(playerC.enemyDic,transform.position);
 
         if (closestBasicEnemy != null)
         {
             enemyRBTransform = closestBasicEnemy.transform;
             if (!closestBasicEnemy.activeSelf)
             {
-                closestBasicEnemy = uM.GetClosestEnemyGameObject(transform.position);
+                closestBasicEnemy = uM.GetClosestEnemyGameObjectDic(playerC.enemyDic, transform.position);
             }
 
-    
             fireTarget = enemyRBTransform.position;
 
             target = playerT.position;
@@ -207,9 +210,9 @@ public class PlayerCopy : NetworkBehaviour
             target = playerT.position;
         }
         engineParticles.GetComponent<ParticleSystem>().startColor = playerC.playerColor.Value;
-
     }
- [ClientRpc]
+
+    [ClientRpc]
     public void despawnClientRpc()
     {
         NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
@@ -225,6 +228,7 @@ public class PlayerCopy : NetworkBehaviour
         NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
         despawnClientRpc();
     }
+
     void FixedUpdate()
     {
         VGShieldTimer += Time.deltaTime;
@@ -237,7 +241,8 @@ public class PlayerCopy : NetworkBehaviour
         {
             VGShield.GetComponent<MeshRenderer>().enabled = true;
         }
-        if(!NetworkManager.Singleton.IsServer) return;
+        if (!NetworkManager.Singleton.IsServer)
+            return;
         if (player == null && uM.playerArray.Length > 0)
         {
             player = uM.GetClosestPlayerGameObject(gameObject.transform.position);
@@ -245,7 +250,8 @@ public class PlayerCopy : NetworkBehaviour
             playerC = player.GetComponent<PlayerController>();
             allies = playerC.allies;
         }
-    if(player == null) return;
+        if (player == null)
+            return;
 
         if (Vector2.Distance(playerT.position, rbTransform.position) < distanceThreshold + 5)
         {
@@ -253,18 +259,16 @@ public class PlayerCopy : NetworkBehaviour
                 rb.velocity = (Vector2)playerC.velocity;
         }
         magnitude = rb.velocity.magnitude;
-        
 
         if (Dissolve.dissolveDone)
         {
             StartCoroutine(DelayedDisable());
- 
-        despawnServerRpc();
-        // despawnClientRpc();
-        // NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
-    }
 
-        
+            despawnServerRpc();
+            // despawnClientRpc();
+            // NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        }
+
         if (hp <= 0)
         {
             Dissolve.isDissolving = true;
@@ -272,7 +276,7 @@ public class PlayerCopy : NetworkBehaviour
         if (hp != hpCheck)
         {
             hpCheck = hp;
-            Dissolve.fade = hp;
+            // Dissolve.fade = hp;
             // sprite.color = new Color(1 - hp, 1 - hp, 1 - hp);
         }
         if (rallied)
@@ -290,26 +294,19 @@ public class PlayerCopy : NetworkBehaviour
         else
             distance = Vector2.Distance(rbTransform.position, fireTarget);
         if (enemies != null)
-            if (enemies.Length < 1)
+            if (playerC.firing)
             {
-                predictedTarget = mousePosition;
+                predictedTarget = playerC.VGMouse;
             }
             else
             {
-                if (playerC.firing)
-                {
-                    predictedTarget = playerC.VGMouse;
-                }
-                else
-                {
-                    time = distance / 80;
-                if(closestBasicEnemy != null)
-                    predictedTarget = 
+                time = distance / 80;
+                if (closestBasicEnemy != null)
+                    predictedTarget =
                         fireTarget + closestBasicEnemy.GetComponent<Rigidbody2D>().velocity * time;
-                }
             }
 
-        Vector2 fireDirection = fireTarget - rb.position;
+        Vector2 fireDirection = predictedTarget - rb.position;
         fireDirection.Normalize();
         float fireAngle = Mathf.Atan2(fireDirection.y, fireDirection.x) * Mathf.Rad2Deg;
         // Quaternion targetRotation;
@@ -358,13 +355,14 @@ public class PlayerCopy : NetworkBehaviour
             bulletAudio.pitch = Random.Range(.9f, 1.1f);
             bulletAudio.Play();
             timer = 0;
-            uM.spawnBulletServerRpc(firePoint.position, firePoint.rotation);
+            uM.spawnBulletServerRpc(firePoint.position, firePoint.rotation, playerC.playerID.Value);
         }
     }
 
     void Update()
     {
-        if(!IsServer) return;
+        if (!IsServer)
+            return;
         if (
             magnitude > 30
             && Vector2.Distance(playerT.position, rbTransform.position) > distanceThreshold
@@ -378,7 +376,8 @@ public class PlayerCopy : NetworkBehaviour
 
     void LateUpdate()
     {
-if(!IsServer) return;
+        if (!IsServer)
+            return;
         if (VGShield.GetComponent<MeshRenderer>().enabled)
         {
             VGShield.transform.rotation = Quaternion.Euler(

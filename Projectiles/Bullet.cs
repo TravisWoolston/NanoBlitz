@@ -11,6 +11,7 @@ public class Bullet : NetworkBehaviour
     public bool boosted = false;
     public Rigidbody2D rb;
     private Transform rbTransform;
+    public int teamID = -1;
 
     void Start()
     {

@@ -8,6 +8,10 @@ public class UM : NetworkBehaviour
 {
     public float VGZ = 10;
     public static UM Instance;
+    public static UM Singleton
+    {
+        get { return Instance; }
+    }
     public float AICount;
     public VectorGrid VG;
     public float currentTask;
@@ -47,10 +51,20 @@ public class UM : NetworkBehaviour
     public Color color4;
     public Color[] colorArray;
     Camera[] playerCams;
+    public string gameMode = "PVP";
 
     void Awake()
     {
-        Instance = this;
+         {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(this.gameObject);
+        }
+        else
+        {
+            Instance = this;
+        }
+    }
     }
 
     void Start()
@@ -65,17 +79,27 @@ public class UM : NetworkBehaviour
         Physics2D.gravity = new Vector2(xGrav, yGrav);
         cloneArray = GameObject.FindGameObjectsWithTag("Clone");
     }
-
-    public void TaskComplete()
-    {
-        currentTask++;
+    // [ServerRpc(RequireOwnership=false)]
+public void UpdateTeams(PlayerController playerC, GameObject go){
+    for(int i = 0; i < playerArray.Length; i++){
+        if(i != playerC.playerID.Value){
+            playerArray[i].GetComponent<PlayerController>().enemyDic.Add(go.GetComponent<NetworkObject>().NetworkObjectId, go);
+        }
+        else {
+            playerArray[i].GetComponent<PlayerController>().allyDic.Add(go.GetComponent<NetworkObject>().NetworkObjectId, go);
+        }
     }
-
-    public void NewAI()
-    {
-        AICount++;
+}
+public void RemoveUpdateTeams(PlayerController playerC, GameObject go){
+    for(int i = 0; i < playerArray.Length; i++){
+        if(i != playerC.playerID.Value){
+            playerArray[i].GetComponent<PlayerController>().enemyDic.Remove(go.GetComponent<NetworkObject>().NetworkObjectId);
+        }
+        else {
+            playerArray[i].GetComponent<PlayerController>().allyDic.Remove(go.GetComponent<NetworkObject>().NetworkObjectId);
+        }
     }
-
+}
     public void Explosion(Transform splodePlace)
     {
         int indexE = UnityEngine.Random.Range(0, explosions.Length);
@@ -256,7 +280,7 @@ public class UM : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void spawnBulletServerRpc(Vector3 objVector, Quaternion objQuat)
+    public void spawnBulletServerRpc(Vector3 objVector, Quaternion objQuat, int teamID)
     {
         // if (!NetworkManager.Singleton.IsServer)
         //     return;
@@ -265,7 +289,9 @@ public class UM : NetworkBehaviour
             objVector,
             objQuat
         );
-        unitToSpawn.GetComponent<Bullet>().prefab = bulletPrefab;
+        Bullet unitToSpawnC = unitToSpawn.GetComponent<Bullet>();
+        unitToSpawnC.prefab = bulletPrefab;
+        unitToSpawnC.teamID = teamID;
 
         if (!unitToSpawn.IsSpawned)
         {
@@ -274,20 +300,19 @@ public class UM : NetworkBehaviour
             rb.AddForce(rb.transform.up * 4000);
         }
 
-        Debug.Log(NetworkObjectPool.Singleton.GetCurrentPrefabCount(bulletPrefab));
-        // spawnBulletClientRpc(objVector, objQuat);
     }
 
     [ClientRpc]
-    public void spawnBulletClientRpc(Vector3 objVector, Quaternion objQuat)
+    public void spawnBulletClientRpc(Vector3 objVector, Quaternion objQuat, int teamID)
     {
-        Debug.Log("spawnBulletClientRpc");
         NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
             bulletPrefab,
             objVector,
             objQuat
         );
-        unitToSpawn.GetComponent<Bullet>().prefab = bulletPrefab;
+        Bullet unitToSpawnC = unitToSpawn.GetComponent<Bullet>();
+        unitToSpawnC.prefab = bulletPrefab;
+        unitToSpawnC.teamID = teamID;
         if (!unitToSpawn.IsSpawned)
             unitToSpawn.Spawn(true);
         Rigidbody2D rb = unitToSpawn.GetComponent<Rigidbody2D>();
@@ -307,7 +332,6 @@ public class UM : NetworkBehaviour
             unitToSpawn.Spawn(true);
         Rigidbody2D rb = unitToSpawn.GetComponent<Rigidbody2D>();
         rb.AddForce(rb.transform.up * 2000);
-        // spawnEnemyBulletClientRpc(objVector, objQuat);
     }
 
     [ClientRpc]
@@ -397,7 +421,34 @@ public class UM : NetworkBehaviour
         }
         return closestGameObject;
     }
-
+public GameObject GetClosestEnemyGameObjectDic(Dictionary<ulong, GameObject> _enemies, Vector3 position)
+{
+    GameObject closestNeutral = GetClosestEnemyGameObject(position); 
+   if(gameMode != "PVP") return closestNeutral;
+    float distance = Mathf.Infinity;
+    Transform closestTransform = null;
+    float closestDistance = float.MaxValue;
+    GameObject closestGameObject = null;
+    foreach (KeyValuePair<ulong, GameObject> kvp in _enemies)
+    {
+        Transform transform = kvp.Value.transform;
+        distance = (transform.position - position).sqrMagnitude;
+        if (distance < closestDistance)
+        {
+            closestTransform = transform;
+            closestDistance = distance;
+            closestGameObject = kvp.Value;
+        }
+    }
+    
+    Transform transformN = closestNeutral.transform;
+    distance = (transformN.position - position).sqrMagnitude;
+    if(distance < closestDistance){
+        return closestNeutral;
+    }
+    else
+    return closestGameObject;
+}
     public GameObject GetClosestEnemyGameObject(Vector3 position)
     {
         float distance = Mathf.Infinity;
@@ -432,27 +483,17 @@ public class UM : NetworkBehaviour
 
     private void UpdateGlobal()
     {
-        // GameObject[] alliesArray = GameObject.FindGameObjectsWithTag("Clone");
         cloneArray = GameObject.FindGameObjectsWithTag("Clone");
-
         combinedAllies = new GameObject[cloneArray.Length + playerArray.Length];
         Array.Copy(playerArray, combinedAllies, playerArray.Length);
         Array.Copy(cloneArray, 0, combinedAllies, playerArray.Length, cloneArray.Length);
-
         allyArray = combinedAllies;
         captains = GameObject.FindGameObjectsWithTag("EnemyCaptain");
         enemies = GameObject.FindGameObjectsWithTag("BasicEnemy");
         allies = allyArray.Length;
-        // Create a new array to hold the combined contents
         GameObject[] combinedEnemies = new GameObject[captains.Length + enemies.Length];
-
-        // Copy the contents of the captains array to the combinedEnemies array
         Array.Copy(captains, combinedEnemies, captains.Length);
-
-        // Copy the contents of the enemies array to the combinedEnemies array, starting at the end of the captains array
         Array.Copy(enemies, 0, combinedEnemies, captains.Length, enemies.Length);
-
-        // Use the combinedEnemies array as the new enemies array
         enemies = combinedEnemies;
         allyArrayTransform = new Transform[allies];
         for (int i = 0; i < allies; i++)
@@ -460,12 +501,6 @@ public class UM : NetworkBehaviour
             allyArrayTransform[i] = allyArray[i].transform;
         }
     }
-
-    // [ServerRpc]
-    // public void AssignPlayerColorServerRpc(){
-    //     playerArray[playerArray.Length - 1].GetComponent<PlayerController>().playerColor = colorArray[playerArray.Length - 1];
-    // Debug.Log(playerArray[playerArray.Length - 1]);
-    // }
     public int GetPlayerID()
     {
         playerArray = GameObject.FindGameObjectsWithTag("Player");
@@ -476,13 +511,7 @@ public class UM : NetworkBehaviour
     void FixedUpdate()
     {
         playerArray = GameObject.FindGameObjectsWithTag("Player");
-        //         for(int i = 0; i < playerArray.Length; i++){
-        // playerArray[i].GetComponent<PlayerController>().enemies = enemies;
-        //         }
-
-
         VGZ = VG.transform.position.z;
-        // UMClientRpc();
     }
 
     [ClientRpc]

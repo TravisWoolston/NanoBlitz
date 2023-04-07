@@ -90,16 +90,20 @@ public class EnemyBasic : NetworkBehaviour
     public Vector2 velocity;
     public GameObject prefab;
     public Transform firePoint;
+    public float enemyID = 0;
+    void Awake(){
+        uM = UM.Instance;
+    }
   public override void OnNetworkSpawn() {
 
-                 uM = UM.Instance;
+                //  uM = UM.Instance;
         
         // rallied = false;
         hp = 1;
        }
     void Start()
     {
-        uM = UM.Instance;
+        
         // player = GameObject.FindGameObjectsWithTag("Player")[0];
         // playerT = player.transform;
         // playerC = player.GetComponent<PlayerController>();

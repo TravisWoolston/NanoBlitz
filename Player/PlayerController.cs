@@ -101,12 +101,17 @@ public class PlayerController : NetworkBehaviour
 
     public GameObject renderCam;
     public CamMovement renderCamC;
-     
+    public Dictionary<ulong, GameObject> allyDic = new Dictionary<ulong, GameObject>();
+    public Dictionary<ulong, GameObject> enemyDic = new Dictionary<ulong, GameObject>();
+
     void Awake()
     {
+        uM = UM.Instance;
         rb.gravityScale = 1;
     }
-
+    public override void OnNetworkSpawn(){
+        AssignPlayerColorServerRpc();
+    }
     [ServerRpc(RequireOwnership = false)]
     public void AssignPlayerColorServerRpc()
     {
@@ -115,15 +120,17 @@ public class PlayerController : NetworkBehaviour
         for (int i = 0; i < uM.playerArray.Length; i++)
         {
             uM.playerArray[i].GetComponent<PlayerController>().playerColor.Value = uM.colorArray[i];
+            uM.playerArray[i].GetComponent<PlayerController>().playerID.Value = i;
+        
         }
     }
 
     void Start()
     {
-        uM = UM.Instance;
+        
         hp = maxHp;
 
-        AssignPlayerColorServerRpc();
+        
         rb.mass = 99999;
         rbTransform = rb.transform;
         rb.angularDrag = 100;
@@ -175,6 +182,7 @@ public class PlayerController : NetworkBehaviour
 
     private void UpdateGlobal()
     {
+        Debug.Log(allyDic.Count + " " + playerID.Value);
         // loop through player array and assign enemies array in UM?
         enemies = uM.enemies;
 
@@ -354,10 +362,9 @@ public class PlayerController : NetworkBehaviour
         //     rbTransform.position,
         //     new Vector3(rbTransform.position.x, rbTransform.position.y + distanceThreshold, 0)
         // );
-        NetworkObject targetObject = null;
         targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
         hpDrain.enabled = true;
-        
+        NetworkObject targetObject = null;
         float mostHp = -1;
         foreach (Collider2D tgt in targets)
         {
@@ -407,37 +414,6 @@ public class PlayerController : NetworkBehaviour
         fireTarget = uM.GetClosestGameObject(enemies, mousePosition);
         if (!IsOwner)
             return;
-
-        if (playerCam == null)
-        {
-            if (IsOwner || IsServer)
-            {
-                playerCam = GameObject.Find("Main Camera");
-                playerCamC = playerCam.GetComponent<CamMovement>();
-                playerCamC.player = rbTransform;
-                renderCam = GameObject.Find("Render Camera");
-                renderCamC = renderCam.GetComponent<CamMovement>();
-                renderCamC.player = rbTransform;
-                playerMM = GameObject.Find("MiniMap");
-                playerMMC = playerMMC.GetComponent<CamMovement>();
-                playerMMC.player = rbTransform;
-            }
-        }
-
-        if (allies < uM.allies)
-        {
-            allies = uM.allies;
-            sHPMax = .5f + (allies / 15);
-            ShieldMeter.SetMaxHealth(sHPMax);
-        }
-        if (sTimer >= 5 && sHP < sHPMax)
-        {
-            sHP += sHPMax / 1000;
-            if (sHP > sHPMax)
-                sHP = sHPMax;
-            ShieldMeter.SetHealth(sHP);
-        }
-        sTimer += Time.deltaTime;
         ShieldMeter.SetHealth(sHP);
         HPBar.SetHealth(hp);
         playerUI.clones = allies;
@@ -529,7 +505,38 @@ public class PlayerController : NetworkBehaviour
 
     void Update()
     {
-        
+        if (!IsOwner)
+            return;
+        if (playerCam == null)
+        {
+            if (IsOwner || IsServer)
+            {
+                playerCam = GameObject.Find("Main Camera");
+                playerCamC = playerCam.GetComponent<CamMovement>();
+                playerCamC.player = rbTransform;
+                renderCam = GameObject.Find("Render Camera");
+                renderCamC = renderCam.GetComponent<CamMovement>();
+                renderCamC.player = rbTransform;
+                playerMM = GameObject.Find("MiniMap");
+                playerMMC = playerMMC.GetComponent<CamMovement>();
+                playerMMC.player = rbTransform;
+            }
+        }
+
+        if (allies < uM.allies)
+        {
+            allies = uM.allies;
+            sHPMax = .5f + (allies / 15);
+            ShieldMeter.SetMaxHealth(sHPMax);
+        }
+        if (sTimer >= 5 && sHP < sHPMax)
+        {
+            sHP += sHPMax / 1000;
+            if (sHP > sHPMax)
+                sHP = sHPMax;
+            ShieldMeter.SetHealth(sHP);
+        }
+        sTimer += Time.deltaTime;
 
         if (Input.GetMouseButton(0))
         {
@@ -565,7 +572,8 @@ public class PlayerController : NetworkBehaviour
 
     void LateUpdate()
     {
-
+        if (!IsOwner)
+            return;
         VGShield.transform.rotation = Quaternion.Euler(
             0.0f,
             0.0f,
