@@ -84,7 +84,7 @@ public class PlayerController : NetworkBehaviour
     float dodgeCD = 0;
     public float distanceThreshold = 0;
     Collider2D[] targets;
-    public Vector3 initialScale;
+    Vector3 initialScale;
     Collider2D[] colliders;
     public GameObject playerCam;
     public GameObject playerMM;
@@ -131,7 +131,7 @@ public class PlayerController : NetworkBehaviour
         hp = maxHp;
 
         
-        rb.mass = 99999;
+        rb.mass = 1000;
         rbTransform = rb.transform;
         rb.angularDrag = 100;
         rb.drag = 1f;
@@ -182,7 +182,6 @@ public class PlayerController : NetworkBehaviour
 
     private void UpdateGlobal()
     {
-        Debug.Log(allyDic.Count + " " + playerID.Value);
         // loop through player array and assign enemies array in UM?
         enemies = uM.enemies;
 
@@ -195,6 +194,9 @@ public class PlayerController : NetworkBehaviour
 
     public void OnCollisionEnter2D(Collision2D collision)
     {
+        if(collision.gameObject.tag == "HammerHead"){
+            ApplyDmg(collision.gameObject.GetComponent<Rigidbody2D>().velocity.magnitude * .1f);
+        }
         if (collision.gameObject.tag == "EnemyBullet")
         {
             ApplyDmg(dmgRate);
@@ -247,12 +249,12 @@ public class PlayerController : NetworkBehaviour
             }
 
             if (IsServer)
-                rb.AddForce(Accelerator(rbTransform.up) * thrustPower);
+                rb.AddForce(Accelerator(rbTransform.up) * (thrustPower*maxHp));
             else
             {
                 uM.moveServerRpc(playerID.Value, Accelerator(rbTransform.up) * thrustPower);
             }
-            thrustAudio.volume = Mathf.MoveTowards(thrustAudio.volume, .5f, Time.deltaTime * .6f);
+            thrustAudio.volume = Mathf.MoveTowards(thrustAudio.volume, .2f, Time.deltaTime * .6f);
         }
         else
         {
@@ -387,6 +389,7 @@ public class PlayerController : NetworkBehaviour
                 .GetComponent<Rigidbody2D>()
                 .AddForce((rbTransform.position - targetObject.transform.position) * 500);
             maxHp += .002f;
+            rb.mass = 1000 * maxHp;
             HPBar.SetMaxHealth(maxHp);
             if(IsServer){
                 hpDrain.SetPosition(0, rbTransform.position);
@@ -411,7 +414,7 @@ public class PlayerController : NetworkBehaviour
         mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         firing = Input.GetMouseButton(0);
 
-        fireTarget = uM.GetClosestGameObject(enemies, mousePosition);
+        fireTarget = uM.GetClosestEnemyGameObjectDic(enemyDic, mousePosition);
         if (!IsOwner)
             return;
         ShieldMeter.SetHealth(sHP);

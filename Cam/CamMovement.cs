@@ -29,7 +29,7 @@ public float mainCamRef;
 
     void Start()
     {
-        scaleRate = zoomRate / 35;
+        scaleRate = zoomRate / 30;
         if (this.gameObject.tag == "MiniMap")
         {
             cam.GetComponent<Camera>().orthographicSize = 600;
@@ -50,6 +50,7 @@ player = playerT;
 }
     void LateUpdate()
     {
+        targetSize = 110 + maxZoom;
         if(player == null) return;
         zoomRate = .05f * maxZoom/10;
 

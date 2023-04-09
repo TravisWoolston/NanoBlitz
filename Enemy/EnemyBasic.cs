@@ -8,7 +8,9 @@ using UnityEngine.Networking;
 
 public class EnemyBasic : NetworkBehaviour
 {
+    public Material shaderMaterial;
     public GameObject player;
+    public Vector3 fireDirection;
     Transform playerT;
     PlayerController playerC;
     public GameObject basicAllyPrefab;
@@ -41,10 +43,11 @@ public class EnemyBasic : NetworkBehaviour
     private float cDist;
     private float pDist;
     public ParticleSystem sparks;
-    public float AIID;
+
     private float AIRemoved = float.MaxValue;
     UM uM;
-
+  
+Collider2D[] targets;
     private bool queUpdate = false;
     float AIQueLength = 0;
     float lastRemoved = 0;
@@ -64,14 +67,14 @@ public class EnemyBasic : NetworkBehaviour
     public float nextWaypointDistance = 8f;
     int currentWaypoint = 0;
     bool reachedEndOfPath = false;
-    Seeker seeker;
+    // Seeker seeker;
 
     public Vector2 goTo;
     private GridGraph gridGraph;
     public GameObject engineParticles;
     GameObject engine;
     public Transform exhaustPoint;
-
+    public AudioSource chargeAudio;
     public AudioSource bulletAudio;
     public AudioClip[] lasers;
     Color color;
@@ -81,7 +84,6 @@ public class EnemyBasic : NetworkBehaviour
     Vector3 VGPos;
     float VGRadius = 1;
     Transform[] playerAlliesT;
-    float pathTimer = 0;
     public Dissolve Dissolve;
     Transform rbTransform;
     float allySearchRadius = 10;
@@ -91,15 +93,22 @@ public class EnemyBasic : NetworkBehaviour
     public GameObject prefab;
     public Transform firePoint;
     public float enemyID = 0;
+    Vector3 initialScale;
+      public LineRenderer hpDrain;
     void Awake(){
         uM = UM.Instance;
     }
   public override void OnNetworkSpawn() {
-
+        uM.UpdateEnemyTeam(gameObject);
                 //  uM = UM.Instance;
         
         // rallied = false;
-        hp = 1;
+        if(this.gameObject.tag == "HammerHead"){
+            hp = 5;
+        }
+       }
+       public override void OnNetworkDespawn(){
+        uM.RemoveUpdateEnemyTeam(gameObject);
        }
     void Start()
     {
@@ -116,14 +125,21 @@ public class EnemyBasic : NetworkBehaviour
             rb.angularDrag = 1000;
             dmgRate = .01f;
             rb.drag = 3;
-            moveSpeed = .8f;
-            rb.mass = 999999;
+            moveSpeed = 20f;
+            rb.mass = 500;
             isCaptain = true;
             fireRate = 2;
             rotationSpeed = .5f;
 
             InvokeRepeating("UpdateCaptainTarget", .1f, 2f);
             fireRange = 100;
+        }
+        else if(this.gameObject.tag == "HammerHead"){
+            dmgRate = .01f;
+            moveSpeed = 80;
+            rotationSpeed = .7f;
+            // InvokeRepeating("UpdateHHTarget", .1f, .7f);
+            fireRate = 5;
         }
         else
         {
@@ -132,10 +148,10 @@ public class EnemyBasic : NetworkBehaviour
             rb.gravityScale = 1;
             rb.mass = 50;
             fireRate = .3f;
-            seeker = GetComponent<Seeker>();
+            // seeker = GetComponent<Seeker>();
 
 
-            engine = Instantiate(engineParticles, exhaustPoint);
+
             bulletAudio.pitch = Random.Range(.9f, 1.1f);
             InvokeRepeating("UpdateTarget", .1f, .7f);
         }
@@ -146,11 +162,12 @@ public class EnemyBasic : NetworkBehaviour
         sprite.color = new Color(1, 0, 0);
         color = sprite.color;
         weapon.parent = this;
+        initialScale = rbTransform.localScale;
     }
 
     void OnEnable()
     {
-        uM = UM.Instance;
+        
                 if (uM.playerArray.Length > 0){
          player = uM.GetClosestPlayerGameObject(transform.position);
                 playerT = player.transform;
@@ -167,7 +184,8 @@ public class EnemyBasic : NetworkBehaviour
     void UpdateAllyArrays()
     {
         uM = UM.Instance;
-        playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
+        // playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
+        playerAllies = uM.allyArray;
         playerAlliesT = FilterEnemiesByDistanceTransform(
             uM.allyArrayTransform,
             transform.position,
@@ -176,19 +194,13 @@ public class EnemyBasic : NetworkBehaviour
     }
 
 
- 
-
-    void OnPathComplete(Path p)
-    {
-        if (!p.error)
-        {
-            path = p;
-            currentWaypoint = 0;
-        }
-    }
-
     private void OnCollisionEnter2D(Collision2D collision)
     {
+        if(gameObject.tag == "HammerHead"){
+            collision.gameObject.GetComponent<Rigidbody2D>().AddForce(rb.velocity);
+            
+            
+        }
         if (collision.gameObject.tag == "Bullet")
         {
             hp -= dmgRate;
@@ -323,6 +335,7 @@ public class EnemyBasic : NetworkBehaviour
     {
         if (player == null)
             return;
+            fireRange = (150f + uM.allies);
         captains = uM.captains;
         playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
         playerPosition = playerC.position;
@@ -386,12 +399,13 @@ public class EnemyBasic : NetworkBehaviour
         
         if (player == null)
             return;
+            fireRange = (100f + uM.allies);
         captains = uM.captains;
 
         playerPosition = playerC.position;
         playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
         closestPlayerObject = GetClosestGameObject(playerAllies, transform.position);
-
+        if(this.gameObject.tag != "HammerHead" && this.gameObject.tag != "EnemyCaptain")
         if (captains.Length > 0 && !rallied)
         {
             float playerDistance = ((Vector3)playerPosition - transform.position).sqrMagnitude;
@@ -442,11 +456,133 @@ public class EnemyBasic : NetworkBehaviour
                 fireTarget = closestPlayerObject.transform.position;
             }
         }
+                float dot = Vector3.Dot(transform.up, fireDirection.normalized);
+        if (
+            timer > fireRate
+            && dot > .9
+            && playerAllies.Length > 0
+        )
+        {
+            int index = Random.Range(0, lasers.Length);
+            bulletAudio.clip = lasers[index];
+            bulletAudio.pitch = Random.Range(.9f, 1.1f);
+            bulletAudio.Play();
+            uM.spawnEnemyBulletServerRpc(firePoint.position, transform.rotation);
+            timer = 0;
+        }
     }
+void UpdateHHTarget()
+    {
+        
+        if (player == null)
+            return;
+            fireRange = (300f);
+        captains = uM.captains;
 
+        playerPosition = playerC.position;
+        playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
+        closestPlayerObject = GetClosestGameObject(playerAllies, transform.position);
+
+        {
+            if (closestPlayerObject == null)
+            {
+                target = playerPosition;
+            }
+            else
+            {
+                target = closestPlayerObject.transform.position;
+                fireTarget = closestPlayerObject.transform.position;
+            }
+        }
+                float dot = Vector3.Dot(transform.up, fireDirection.normalized);
+        if (
+            timer > fireRate
+            && dot > .9
+            && playerAllies.Length > 0
+
+        )
+        {
+            if(!Dissolve.charging){
+                Dissolve.charging = true;
+                chargeAudio.loop = true;
+            chargeAudio.Play();
+            } 
+            
+            
+  
+        }
+
+            if(Dissolve.colorIntensity > 2 || !Dissolve.charging){
+                chargeAudio.volume = Mathf.MoveTowards(chargeAudio.volume, 0f, Time.deltaTime * 8f);
+            } 
+            if(Dissolve.charging) {
+                chargeAudio.volume = Mathf.MoveTowards(chargeAudio.volume, .2f, Time.deltaTime *5f);
+            }
+        
+    }
+    void Upgrade()
+    {
+        // Debug.DrawLine(
+        //     rbTransform.position,
+        //     new Vector3(rbTransform.position.x, rbTransform.position.y + distanceThreshold, 0)
+        // );
+        targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
+        hpDrain.enabled = true;
+        NetworkObject targetObject = null;
+        float mostHp = -1;
+        foreach (Collider2D tgt in targets)
+        {
+            NetworkObject go = tgt.gameObject.GetComponent<NetworkObject>();
+            if (go.tag == "BasicEnemy")
+            {
+                EnemyBasic playerCopy = go.GetComponent<EnemyBasic>();
+                if (playerCopy.hp > mostHp)
+                {
+                    mostHp = playerCopy.hp;
+                    targetObject = go;
+                }
+            }
+        }
+
+        if (targetObject != null)
+        {
+            targetObject.GetComponent<EnemyBasic>().hp -= 0.005f;
+            targetObject
+                .GetComponent<Rigidbody2D>()
+                .AddForce((rbTransform.position - targetObject.transform.position) * 500);
+            hp += .002f;
+            rb.mass = 500 * hp;
+
+            if(IsServer){
+                hpDrain.SetPosition(0, rbTransform.position);
+            hpDrain.SetPosition(1, targetObject.transform.position);
+            
+            }
+        }
+        if(IsServer)
+        rbTransform.localScale = initialScale * hp;
+
+    }
     void FixedUpdate()
     {
 if(!NetworkManager.Singleton.IsServer) return;
+if(gameObject.tag == "EnemyCaptain"){
+    Upgrade();
+}
+if(gameObject.tag == "HammerHead"){
+              if(Dissolve.colorIntensity > 6){
+                //Charge!
+                Debug.Log("Charge!");
+                
+                rb.AddForce(Accelerator(rbTransform.up) * (thrustPower * 400));
+                timer=0;
+                Dissolve.charging = false;
+                chargeAudio.Stop();
+            chargeAudio.loop = false;
+                Dissolve.colorIntensity = 0;
+            }
+    UpdateHHTarget();
+}
         if (player == null && uM.playerArray.Length > 0)
         {
             player = uM.GetClosestPlayerGameObject(gameObject.transform.position);
@@ -465,8 +601,8 @@ if(!NetworkManager.Singleton.IsServer) return;
             Dissolve.isDissolving = true;
             
         }
-        pathTimer += Time.deltaTime;
-        fireRange = (100f + uM.allies);
+
+        
         if (!isCaptain && path != null)
         {
             if (path.vectorPath != null)
@@ -510,7 +646,7 @@ if(!NetworkManager.Singleton.IsServer) return;
         targetDirection.Normalize();
         float targetAngle = Mathf.Atan2(targetDirection.y, targetDirection.x) * Mathf.Rad2Deg;
 
-        Vector2 fireDirection = fireTarget - rb.position;
+        fireDirection = fireTarget - rb.position;
         fireDirection.Normalize();
         float fireAngle = Mathf.Atan2(fireDirection.y, fireDirection.x) * Mathf.Rad2Deg;
 
@@ -553,7 +689,7 @@ if(!NetworkManager.Singleton.IsServer) return;
                 else if (isCaptain)
                     rb.AddForce(
                         Accelerator(rbTransform.up)
-                            * (thrustPower * Vector2.Distance(target, rb.position) / 10)
+                            * (thrustPower)
                     );
                 else
                 {
@@ -569,21 +705,7 @@ if(!NetworkManager.Singleton.IsServer) return;
                 }
             }
         }
-        float dot = Vector3.Dot(transform.up, fireDirection.normalized);
-        if (
-            timer > fireRate
-            && dot > .9
-            && playerAllies.Length > 0
-            && gameObject.tag == "BasicEnemy"
-        )
-        {
-            int index = Random.Range(0, lasers.Length);
-            bulletAudio.clip = lasers[index];
-            bulletAudio.pitch = Random.Range(.9f, 1.1f);
-            bulletAudio.Play();
-            uM.spawnEnemyBulletServerRpc(firePoint.position, transform.rotation);
-            timer = 0;
-        }
+        
     }
 
     void Update()

@@ -67,7 +67,7 @@ public class PlayerCopy : NetworkBehaviour
     GameObject[] playerArray;
     public GameObject prefab;
     public Transform firePoint;
-    public int playerID;
+    public bool reclaimed = false;
 
     void Awake()
     {
@@ -91,6 +91,7 @@ public class PlayerCopy : NetworkBehaviour
     }
     void Start()
     {
+        uM = UM.Instance;
         // activeShield = true;
         // player = GameObject.FindGameObjectsWithTag("Player")[0];
         // playerT = player.transform;
@@ -129,6 +130,10 @@ public class PlayerCopy : NetworkBehaviour
         if (collision.gameObject.tag == "EnemyBullet" && !activeShield)
         {
             hp -= .0314f;
+        }
+        if (collision.gameObject.tag == "HammerHead" && !activeShield)
+        {
+            hp -= 1f;
         }
         if(collision.gameObject.tag == "Bullet" ){
             if(collision.gameObject.GetComponent<Bullet>().teamID != playerC.playerID.Value){
@@ -243,7 +248,7 @@ public class PlayerCopy : NetworkBehaviour
         }
         if (!NetworkManager.Singleton.IsServer)
             return;
-        if (player == null && uM.playerArray.Length > 0)
+        if (player == null && uM.playerArray.Length > 0 && reclaimed)
         {
             player = uM.GetClosestPlayerGameObject(gameObject.transform.position);
             playerT = player.transform;
@@ -370,7 +375,7 @@ public class PlayerCopy : NetworkBehaviour
         {
             VGPos = rb.position;
             VGPos.z = VGZ;
-            uM.VG.AddGridForce(VGPos, 5, 3, color, true);
+            // uM.VG.AddGridForce(VGPos, 0, 3, color, true);
         }
     }
 

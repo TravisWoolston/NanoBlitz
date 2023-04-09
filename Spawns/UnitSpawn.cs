@@ -31,11 +31,14 @@ public class UnitSpawn : NetworkBehaviour
         uM = UM.Instance;
                             if (this.gameObject.tag == "EnemyCptSpawn")
         {
-            spawn = 100;
+            spawn = 50;
+        }
+        else if (this.gameObject.tag == "EnemyHHSpawn"){
+            spawn = 30;
         }
         else
         {
-            spawn = 15;
+            spawn = 5;
         }
             if (this.gameObject.tag == "EnemyCptSpawn")
             {
@@ -69,15 +72,21 @@ void spawnUnit(GameObject unitPrefab) {
             {
                 uM.spawnEnemyCptServerRpc(transform.position, transform.rotation);
             }
+            else if(this.gameObject.tag == "EnemyHHSpawn"){
+                uM.spawnEnemyHHServerRpc(transform.position, transform.rotation);
+            }
             else
             {
                 uM.spawnEnemyBasicServerRpc(transform.position, transform.rotation);
+                
             }
 
             spawnTimer = 0;
             if (spawn > 4)
                 if (this.gameObject.tag == "EnemyCptSpawn")
                     spawn -= UM.Instance.allies / 4;
+                     else if (this.gameObject.tag == "EnemyHHSpawn")
+                     spawn = 100 - GameObject.FindGameObjectsWithTag("Clone").Length;
                 else
                     spawn -= UM.Instance.allies / 100;
         }

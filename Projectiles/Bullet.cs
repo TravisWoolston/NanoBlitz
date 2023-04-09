@@ -42,8 +42,12 @@ public class Bullet : NetworkBehaviour
         //         despawnClientRpc();
         // NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
         // }
-    if (NetworkObject.IsSpawned)
-        despawnServerRpc();
+    if (NetworkObject.IsSpawned){
+        uM.spawnSparkServerRpc(rbTransform.position, Quaternion.LookRotation(-rb.velocity.normalized));
+
+despawnServerRpc();
+    }
+        
         // despawnClientRpc();
     }
 
@@ -85,6 +89,7 @@ public class Bullet : NetworkBehaviour
             expiration = 0;
 
             //  despawnClientRpc();
+
             despawnServerRpc();
         }
     }

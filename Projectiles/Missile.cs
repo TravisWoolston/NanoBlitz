@@ -44,7 +44,7 @@ public class Missile : NetworkBehaviour
     public GameObject prefab;
     private bool boosted = false;
     float thrustPower;
-
+public Dictionary<ulong, GameObject> enemyDic = new Dictionary<ulong, GameObject>();
     //     public AudioSource explosionSFX;
     //     private AudioClip exp;
     // public AudioClip[] explosions;
@@ -98,23 +98,33 @@ public class Missile : NetworkBehaviour
 
     public void SetTarget(Vector3 EMTarget)
     {
-        // targetGameObject = EMTarget;
+        
         target = EMTarget;
     }
 
-    public void SetPlayerTarget(GameObject MTarget)
+    public void SetPlayerTarget(GameObject MTarget, Dictionary<ulong, GameObject> parentEnemyDic)
     {
+        enemyDic = parentEnemyDic;
         // targetGameObject = EMTarget;
         targetGameObject = MTarget;
     }
-
+public bool DicCheck(GameObject gameObjectToCheck)
+    {
+        foreach (var kvp in enemyDic)
+        {
+            if (kvp.Value == gameObjectToCheck)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (gameObject.tag == "Missile")
         {
             if (
-                collision.gameObject.tag == "BasicEnemy"
-                || collision.gameObject.tag == "EnemyCaptain"
+                DicCheck(collision.gameObject)
             )
             {
                 Explode();
@@ -155,7 +165,7 @@ public class Missile : NetworkBehaviour
                     }
                     Vector2 force = direction.normalized * explosionForce * effect;
 
-                    if (hit.tag == "BasicEnemy")
+                    if (hit.tag == "BasicEnemy" || hit.tag == "HammerHead")
                     {
                         contact = true;
                         rb.gameObject.GetComponent<EnemyBasic>().hp -= effect * .4f;

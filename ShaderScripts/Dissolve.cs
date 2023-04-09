@@ -9,7 +9,8 @@ public class Dissolve : MonoBehaviour
     public float fade = 1f;
     bool isForming;
     public bool dissolveDone = false;
-
+    public float colorIntensity = 0.5f;
+    public bool charging = false;
     void awake()
     {
         isForming = false;
@@ -32,7 +33,7 @@ public class Dissolve : MonoBehaviour
     // void Melting() {
     //     isDissolving = true;
     // }
-    void Update()
+    void FixedUpdate()
     {
         if (isForming)
             isDissolving = false;
@@ -48,11 +49,11 @@ public class Dissolve : MonoBehaviour
             {
                 fade = 0f;
                 dissolveDone = true;
-                material.SetFloat("_Fade", fade);
+            
                 isDissolving = false;
             }
 
-            material.SetFloat("_Fade", fade);
+            
         }
         if (isForming)
         {
@@ -62,8 +63,13 @@ public class Dissolve : MonoBehaviour
                 fade = 1;
                 isForming = false;
             }
-            material.SetFloat("_Fade", fade);
+        
         }
+        if(charging){
+            colorIntensity += Time.deltaTime;
+            
+        }
+        material.SetFloat("_ColorIntensity", colorIntensity);
          material.SetFloat("_Fade", fade);
     }
 }

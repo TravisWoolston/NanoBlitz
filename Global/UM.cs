@@ -27,6 +27,8 @@ public class UM : NetworkBehaviour
     public GameObject playerTrail;
     public GameObject trail;
     public GameObject enemyTrail;
+    public GameObject enemyHHPrefab;
+    public GameObject sparkPrefab;
     public bool updateNeeded = false;
     private float delayTime = .7f;
     public float VGForce = .03f;
@@ -52,7 +54,8 @@ public class UM : NetworkBehaviour
     public Color[] colorArray;
     Camera[] playerCams;
     public string gameMode = "PVP";
-
+    public float sparkTimer = 0;
+    public List<NetworkObject> activeSparks = new List<NetworkObject>();
     void Awake()
     {
          {
@@ -64,6 +67,7 @@ public class UM : NetworkBehaviour
         {
             Instance = this;
         }
+
     }
     }
 
@@ -80,6 +84,16 @@ public class UM : NetworkBehaviour
         cloneArray = GameObject.FindGameObjectsWithTag("Clone");
     }
     // [ServerRpc(RequireOwnership=false)]
+    public void UpdateEnemyTeam(GameObject go){
+        for(int i = 0; i < playerArray.Length; i++){
+            playerArray[i].GetComponent<PlayerController>().enemyDic.Add(go.GetComponent<NetworkObject>().NetworkObjectId, go);
+    }
+    }
+    public void RemoveUpdateEnemyTeam(GameObject go){
+        for(int i = 0; i < playerArray.Length; i++){
+            playerArray[i].GetComponent<PlayerController>().enemyDic.Remove(go.GetComponent<NetworkObject>().NetworkObjectId, out go);
+    }
+    }
 public void UpdateTeams(PlayerController playerC, GameObject go){
     for(int i = 0; i < playerArray.Length; i++){
         if(i != playerC.playerID.Value){
@@ -210,6 +224,21 @@ public void RemoveUpdateTeams(PlayerController playerC, GameObject go){
         if (!unitToSpawn.IsSpawned)
             unitToSpawn.Spawn(true);
     }
+  [ServerRpc]
+    public void spawnEnemyHHServerRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        if (!NetworkManager.Singleton.IsServer)
+            return;
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            enemyHHPrefab,
+            objVector,
+            objQuat
+        );
+
+        unitToSpawn.GetComponent<EnemyBasic>().prefab = enemyHHPrefab;
+        if (!unitToSpawn.IsSpawned)
+            unitToSpawn.Spawn(true);
+    }
 
     [ServerRpc]
     public void spawnCloneServerRpc(Vector3 objVector, Quaternion objQuat)
@@ -248,7 +277,7 @@ public void RemoveUpdateTeams(PlayerController playerC, GameObject go){
         PlayerController parent = playerArray[
             serverRpcParams.Receive.SenderClientId
         ].GetComponent<PlayerController>();
-        netMissileC.SetPlayerTarget(parent.fireTarget);
+        netMissileC.SetPlayerTarget(parent.fireTarget, parent.enemyDic);
         unitToSpawn.GetComponent<Rigidbody2D>().AddForce(parent.firePoint.up * 6000);
     }
 
@@ -278,7 +307,36 @@ public void RemoveUpdateTeams(PlayerController playerC, GameObject go){
         netMissileC.SetTarget(cptParent.fireTarget);
         unitToSpawn.GetComponent<Rigidbody2D>().AddForce(cptParent.firePoint.up * 6000);
     }
+[ServerRpc(RequireOwnership = false)]
+    public void spawnSparkServerRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        // if (!NetworkManager.Singleton.IsServer)
+        //     return;
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            sparkPrefab,
+            objVector,
+            objQuat
+        );
+        ParticleSystem unitToSpawnC = unitToSpawn.GetComponent<ParticleSystem>();
+        unitToSpawnC.Play();
 
+        if (!unitToSpawn.IsSpawned)
+        {
+
+            unitToSpawn.Spawn(true);
+            
+            activeSparks.Add(unitToSpawn);
+        }
+
+    }
+    [ServerRpc(RequireOwnership = false)]
+    public void despawnSparkServerRpc(){
+        NetworkObject nextSpark = activeSparks[0];
+NetworkObjectPool.Singleton.ReturnNetworkObject(nextSpark, sparkPrefab);
+nextSpark.Despawn();
+activeSparks.RemoveAt(0);
+    
+    }
     [ServerRpc(RequireOwnership = false)]
     public void spawnBulletServerRpc(Vector3 objVector, Quaternion objQuat, int teamID)
     {
@@ -423,8 +481,8 @@ public void RemoveUpdateTeams(PlayerController playerC, GameObject go){
     }
 public GameObject GetClosestEnemyGameObjectDic(Dictionary<ulong, GameObject> _enemies, Vector3 position)
 {
-    GameObject closestNeutral = GetClosestEnemyGameObject(position); 
-   if(gameMode != "PVP") return closestNeutral;
+    // GameObject closestNeutral = GetClosestEnemyGameObject(position); 
+//    if(gameMode != "PVP") return closestNeutral;
     float distance = Mathf.Infinity;
     Transform closestTransform = null;
     float closestDistance = float.MaxValue;
@@ -441,12 +499,12 @@ public GameObject GetClosestEnemyGameObjectDic(Dictionary<ulong, GameObject> _en
         }
     }
     
-    Transform transformN = closestNeutral.transform;
-    distance = (transformN.position - position).sqrMagnitude;
-    if(distance < closestDistance){
-        return closestNeutral;
-    }
-    else
+    // Transform transformN = closestNeutral.transform;
+    // distance = (transformN.position - position).sqrMagnitude;
+    // if(distance < closestDistance){
+    //     return closestNeutral;
+    // }
+    // else
     return closestGameObject;
 }
     public GameObject GetClosestEnemyGameObject(Vector3 position)
@@ -512,6 +570,15 @@ public GameObject GetClosestEnemyGameObjectDic(Dictionary<ulong, GameObject> _en
     {
         playerArray = GameObject.FindGameObjectsWithTag("Player");
         VGZ = VG.transform.position.z;
+        int activeSparksCount = activeSparks.Count;
+        if(activeSparksCount > 0){
+            sparkTimer+=Time.deltaTime * activeSparksCount;
+        }
+        if(sparkTimer> 1){
+            sparkTimer = 0;
+            despawnSparkServerRpc();
+        }
+        
     }
 
     [ClientRpc]
