@@ -50,7 +50,7 @@ player = playerT;
 }
     void LateUpdate()
     {
-        targetSize = 110 + maxZoom;
+        // targetSize = 110 + maxZoom;
         if(player == null) return;
         zoomRate = .05f * maxZoom/10;
 

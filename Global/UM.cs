@@ -29,6 +29,7 @@ public class UM : NetworkBehaviour
     public GameObject enemyTrail;
     public GameObject enemyHHPrefab;
     public GameObject sparkPrefab;
+    public GameObject explosionPrefab;
     public bool updateNeeded = false;
     private float delayTime = .7f;
     public float VGForce = .03f;
@@ -277,6 +278,7 @@ public void RemoveUpdateTeams(PlayerController playerC, GameObject go){
         PlayerController parent = playerArray[
             serverRpcParams.Receive.SenderClientId
         ].GetComponent<PlayerController>();
+        // Debug.Log("missile parent: " + parent.fireTarget + " " + parent.enemyDic);
         netMissileC.SetPlayerTarget(parent.fireTarget, parent.enemyDic);
         unitToSpawn.GetComponent<Rigidbody2D>().AddForce(parent.firePoint.up * 6000);
     }
@@ -322,9 +324,7 @@ public void RemoveUpdateTeams(PlayerController playerC, GameObject go){
 
         if (!unitToSpawn.IsSpawned)
         {
-
-            unitToSpawn.Spawn(true);
-            
+            unitToSpawn.Spawn(true); 
             activeSparks.Add(unitToSpawn);
         }
 
@@ -332,11 +332,45 @@ public void RemoveUpdateTeams(PlayerController playerC, GameObject go){
     [ServerRpc(RequireOwnership = false)]
     public void despawnSparkServerRpc(){
         NetworkObject nextSpark = activeSparks[0];
-NetworkObjectPool.Singleton.ReturnNetworkObject(nextSpark, sparkPrefab);
+        GameObject prefab;
+        if(nextSpark.tag == "Spark"){
+            prefab = sparkPrefab;
+        } else {
+            prefab = explosionPrefab;
+        }
+NetworkObjectPool.Singleton.ReturnNetworkObject(nextSpark, prefab);
 nextSpark.Despawn();
 activeSparks.RemoveAt(0);
     
     }
+[ServerRpc(RequireOwnership = false)]
+    public void spawnExplosionServerRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        // if (!NetworkManager.Singleton.IsServer)
+        //     return;
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            explosionPrefab,
+            objVector,
+            objQuat
+        );
+        ParticleSystem unitToSpawnC = unitToSpawn.GetComponent<ParticleSystem>();
+        unitToSpawnC.Play();
+
+        if (!unitToSpawn.IsSpawned)
+        {
+            unitToSpawn.Spawn(true); 
+            activeSparks.Add(unitToSpawn);
+        }
+
+    }
+//     [ServerRpc(RequireOwnership = false)]
+//     public void despawnExplosionServerRpc(){
+//         NetworkObject nextSpark = activeSparks[0];
+// NetworkObjectPool.Singleton.ReturnNetworkObject(nextSpark, explosionPrefab);
+// nextSpark.Despawn();
+// activeSparks.RemoveAt(0);
+    
+//     }
     [ServerRpc(RequireOwnership = false)]
     public void spawnBulletServerRpc(Vector3 objVector, Quaternion objQuat, int teamID)
     {

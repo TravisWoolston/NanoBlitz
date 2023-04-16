@@ -238,11 +238,12 @@ public bool DicCheck(GameObject gameObjectToCheck)
             }
         }
 
-        ParticleSystem spark = Instantiate(explosion, this.transform.position, Quaternion.identity);
-        Destroy(spark, 2f);
+        // ParticleSystem spark = Instantiate(explosion, this.transform.position, Quaternion.identity);
+        // Destroy(spark, 2f);
+
         uM.AddGridForce(transform.position, -5, 8, rippleColor, true);
         uM.Explosion(transform);
-
+        uM.spawnExplosionServerRpc(rbTransform.position, rbTransform.rotation);
         // uM.despawn(prefab);
 
         if (!IsServer)
@@ -351,7 +352,7 @@ if (NetworkObject.IsSpawned)
             //     predictedTarget = uM.position;
             // }
             // else
-            if (timer > 6)
+            if (timer > 3)
             {
                 predictedTarget = uM.allyArray[0].transform.position;
             }

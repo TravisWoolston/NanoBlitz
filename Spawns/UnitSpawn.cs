@@ -73,22 +73,17 @@ void spawnUnit(GameObject unitPrefab) {
                 uM.spawnEnemyCptServerRpc(transform.position, transform.rotation);
             }
             else if(this.gameObject.tag == "EnemyHHSpawn"){
+                spawn = 200 - GameObject.FindGameObjectsWithTag("Clone").Length;
                 uM.spawnEnemyHHServerRpc(transform.position, transform.rotation);
             }
             else
             {
                 uM.spawnEnemyBasicServerRpc(transform.position, transform.rotation);
-                
+                spawn = 2;
             }
 
             spawnTimer = 0;
-            if (spawn > 4)
-                if (this.gameObject.tag == "EnemyCptSpawn")
-                    spawn -= UM.Instance.allies / 4;
-                     else if (this.gameObject.tag == "EnemyHHSpawn")
-                     spawn = 100 - GameObject.FindGameObjectsWithTag("Clone").Length;
-                else
-                    spawn -= UM.Instance.allies / 100;
+                    
         }
         if (this.gameObject.tag == "EnemyCptSpawn")
         {

@@ -20,42 +20,70 @@ public class NetworkManagerUI : NetworkBehaviour
     private Button localJoinBtn;
     [SerializeField]
     private InputField serverKeyInput;
-
-
+    public string hostType;
     private void Awake()
     {
+        hostType = MainMenu.HostType;
         serverKeyInput.text = "Enter Key";
         serverBtn.onClick.AddListener(() =>
         {
-            NetworkManager.Singleton.StartServer();
+            StartServer();
             // NetworkManager.Singleton.SceneManager.LoadScene("Overworld", LoadSceneMode.Single);
         });
+        if(hostType == "RelayHost"){
+            // GetComponent<ServerRelay>().SignIn();
+            CreateRelay();
+        }
         hostBtn.onClick.AddListener(() =>
         {
-             GetComponent<ServerRelay>().CreateRelay();
-            // NetworkManager.Singleton.StartHost();
-            NetworkObjectPool.Singleton.InitializePool();
-            // NetworkManager.Singleton.SceneManager.LoadScene("Overworld", LoadSceneMode.Single);
+             CreateRelay();
         });
-
+        if(hostType == "Client"){
+            // GetComponent<ServerRelay>().SignIn();
+            JoinRelay();
+        }
         clientBtn.onClick.AddListener(() =>
         {
-            GetComponent<ServerRelay>().JoinRelay();
-            // NetworkManager.Singleton.StartClient();
-            NetworkObjectPool.Singleton.InitializePool();
+            JoinRelay();
         });
+        if(hostType == "LocalHost"){
+            LocalHost();
+        }
                 localHostBtn.onClick.AddListener(() =>
         {
-            //  GetComponent<ServerRelay>().CreateRelay();
-            NetworkManager.Singleton.StartHost();
-            NetworkObjectPool.Singleton.InitializePool();
-            // NetworkManager.Singleton.SceneManager.LoadScene("Overworld", LoadSceneMode.Single);
+           LocalHost();
         });
         localJoinBtn.onClick.AddListener(() =>
         {
-            // GetComponent<ServerRelay>().JoinRelay();
+           LocalJoin();
+        });
+        Debug.Log("Host type: " + MainMenu.HostType);
+        
+    }
+    public void StartServer(){
+            NetworkManager.Singleton.StartServer();
+        }
+        public void CreateRelay(){
+            GetComponent<ServerRelay>().CreateRelay();
+            // NetworkManager.Singleton.StartHost();
+            NetworkObjectPool.Singleton.InitializePool();
+            // NetworkManager.Singleton.SceneManager.LoadScene("Overworld", LoadSceneMode.Single);
+        }
+        public void JoinRelay(){
+            GetComponent<ServerRelay>().JoinRelay(MainMenu.ServerKey);
+            // NetworkManager.Singleton.StartClient();
+            NetworkObjectPool.Singleton.InitializePool();
+        }
+        public void LocalHost(){
+             //  GetComponent<ServerRelay>().CreateRelay();
+            NetworkManager.Singleton.StartHost();
+            NetworkObjectPool.Singleton.InitializePool();
+            // NetworkManager.Singleton.SceneManager.LoadScene("Overworld", LoadSceneMode.Single);
+        }
+        public void LocalJoin(){
+             // GetComponent<ServerRelay>().JoinRelay();
+            
             NetworkManager.Singleton.StartClient();
             NetworkObjectPool.Singleton.InitializePool();
-        });
-    }
+        }
 }

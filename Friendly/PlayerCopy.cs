@@ -17,7 +17,7 @@ public class PlayerCopy : NetworkBehaviour
     public Vector2 target;
     public Vector2 fireTarget;
     public Rigidbody2D rb;
-    public Weapon weapon;
+    // public Weapon weapon;
     Vector2 moveDirection;
     Vector2 mousePosition;
 
@@ -96,7 +96,7 @@ public class PlayerCopy : NetworkBehaviour
         // player = GameObject.FindGameObjectsWithTag("Player")[0];
         // playerT = player.transform;
         // playerC = player.GetComponent<PlayerController>();
-        weapon.hasMissiles = false;
+        // weapon.hasMissiles = false;
         VGZ = uM.VGZ;
         allies = uM.allies;
         enemies = uM.enemies;

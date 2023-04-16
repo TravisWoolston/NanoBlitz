@@ -103,7 +103,7 @@ public class PlayerController : NetworkBehaviour
     public CamMovement renderCamC;
     public Dictionary<ulong, GameObject> allyDic = new Dictionary<ulong, GameObject>();
     public Dictionary<ulong, GameObject> enemyDic = new Dictionary<ulong, GameObject>();
-
+    float boostMod = 100;
     void Awake()
     {
         uM = UM.Instance;
@@ -143,7 +143,7 @@ public class PlayerController : NetworkBehaviour
         if (!IsOwner)
             return;
 
-        GameObject.FindGameObjectWithTag("NMUI").SetActive(false);
+        
         playerUIGO = GameObject.Find("UIPlayerValues");
         playerUI = playerUIGO.GetComponent<UIPlayerValues>();
 
@@ -270,26 +270,26 @@ public class PlayerController : NetworkBehaviour
                 accTimer -= Time.deltaTime;
             }
         }
-        if (Input.GetKey(KeyCode.A))
+        if (Input.GetKey(KeyCode.A) && dodgeCD > 2)
         {
-            if (IsServer)
+            if (IsServer && IsOwner)
             {
-                rb.AddForce(Accelerator(-rbTransform.right) * thrustPower);
+                rb.AddForce(Accelerator(-rbTransform.right) * (thrustPower * boostMod * maxHp));
             }
             else
-                uM.moveServerRpc(playerID.Value, Accelerator(-rbTransform.right) * thrustPower);
+                uM.moveServerRpc(playerID.Value, Accelerator(-rbTransform.right) * (thrustPower * boostMod * maxHp));
 
             dodgeCD = 0;
         }
-        if (Input.GetKey(KeyCode.D))
+        if (Input.GetKey(KeyCode.D) && dodgeCD > 2)
         {
             dodgeCD = 0;
             if (IsServer)
             {
-                rb.AddForce(Accelerator(rbTransform.right) * thrustPower);
+                rb.AddForce(Accelerator(rbTransform.right) * (thrustPower * boostMod * maxHp));
             }
             else
-                uM.moveServerRpc(playerID.Value, Accelerator(rbTransform.right) * thrustPower);
+                uM.moveServerRpc(playerID.Value, Accelerator(rbTransform.right) * (thrustPower * boostMod * maxHp));
         }
     }
 
@@ -313,10 +313,7 @@ public class PlayerController : NetworkBehaviour
 
     void recoverHP()
     {
-        Debug.DrawLine(
-            rbTransform.position,
-            new Vector3(rbTransform.position.x, rbTransform.position.y + distanceThreshold, 0)
-        );
+
         targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
         hpDrain.enabled = true;
         float healRate = .002f * maxHp;
@@ -340,7 +337,7 @@ public class PlayerController : NetworkBehaviour
         {
             Transform targetObjT = targetObject.transform;
             targetObject.GetComponent<PlayerCopy>().hp -= healRate;
-            if (Vector2.Distance(rbTransform.position, targetObjT.position) > distanceThreshold / 2)
+            if (Vector2.Distance(rbTransform.position, targetObjT.position) > distanceThreshold /4)
                 targetObject
                     .GetComponent<Rigidbody2D>()
                     .AddForce((rbTransform.position - targetObjT.position) * 500);
@@ -400,20 +397,21 @@ public class PlayerController : NetworkBehaviour
                 uM.UpgradeServerRpc(playerID.Value, rbTransform.position, targetObject.transform.position);
             }
         }
-        if(IsServer)
-        rbTransform.localScale = initialScale * maxHp;
-        else
-        uM.scaleServerRpc(playerID.Value, initialScale * maxHp);
+        // if(IsServer)
+        // rbTransform.localScale = initialScale * maxHp;
+        // else
+        // uM.scaleServerRpc(playerID.Value, initialScale * maxHp);
     }
 
     private void FixedUpdate()
     {
         magnitude = rb.velocity.magnitude;
-        distanceThreshold = (30 + maxHp);
+        distanceThreshold = (30);
+        // distanceThreshold = (30 + maxHp);
         velocity = rb.velocity;
         mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         firing = Input.GetMouseButton(0);
-
+    dodgeCD += Time.deltaTime;
         fireTarget = uM.GetClosestEnemyGameObjectDic(enemyDic, mousePosition);
         if (!IsOwner)
             return;
@@ -551,7 +549,7 @@ public class PlayerController : NetworkBehaviour
 
         VGPos = rb.position;
         VGPos.z = uM.VGZ;
-        uM.VG.AddGridForce(VGPos, 5, maxHp * 1.4f, playerColor.Value, true);
+        uM.VG.AddGridForce(VGPos, 5, hp * 1.2f, playerColor.Value, true);
 
         if (colliders != null)
             foreach (Collider2D hit in colliders)

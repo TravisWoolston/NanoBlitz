@@ -13,7 +13,7 @@ public class ServerRelay : MonoBehaviour
 {
     public InputField keyInput;
     public bool buttonClicked = false;
-    private async void Start()
+    private async void SignIn()
     {
         await UnityServices.InitializeAsync();
         AuthenticationService.Instance.SignedIn += () =>
@@ -28,6 +28,7 @@ public class ServerRelay : MonoBehaviour
     {
         if(buttonClicked) return;
         buttonClicked = true;
+        SignIn();
         try
         {
             Allocation allocation = await RelayService.Instance.CreateAllocationAsync(3);
@@ -48,9 +49,9 @@ GameObject.Find("UIPlayerValues").GetComponent<UIPlayerValues>().serverKey = joi
         
     }
 
-    public async void JoinRelay()
+    public async void JoinRelay(string joinCode)
     {
-        string joinCode = keyInput.text;
+        SignIn();
         try
         {
             Debug.Log("Joining Relay with " + joinCode);

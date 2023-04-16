@@ -58,15 +58,15 @@ Collider2D[] targets;
     public GameObject closestCaptain;
     private Transform closestCaptainT;
 
-    public EnemyWeapon weapon;
+    // public EnemyWeapon weapon;
     private float fireRate;
     private GameObject closestAllyObject;
     float rotationSpeed = 2f;
 
-    Path path;
+    // Path path;
     public float nextWaypointDistance = 8f;
     int currentWaypoint = 0;
-    bool reachedEndOfPath = false;
+    // bool reachedEndOfPath = false;
     // Seeker seeker;
 
     public Vector2 goTo;
@@ -99,6 +99,7 @@ Collider2D[] targets;
         uM = UM.Instance;
     }
   public override void OnNetworkSpawn() {
+    if(IsServer)
         uM.UpdateEnemyTeam(gameObject);
                 //  uM = UM.Instance;
         
@@ -108,6 +109,7 @@ Collider2D[] targets;
         }
        }
        public override void OnNetworkDespawn(){
+        if(IsServer)
         uM.RemoveUpdateEnemyTeam(gameObject);
        }
     void Start()
@@ -131,7 +133,7 @@ Collider2D[] targets;
             fireRate = 2;
             rotationSpeed = .5f;
 
-            InvokeRepeating("UpdateCaptainTarget", .1f, 2f);
+            InvokeRepeating("UpdateCaptainTarget", .1f, .5f);
             fireRange = 100;
         }
         else if(this.gameObject.tag == "HammerHead"){
@@ -161,7 +163,7 @@ Collider2D[] targets;
         sprite = this.GetComponent<SpriteRenderer>();
         sprite.color = new Color(1, 0, 0);
         color = sprite.color;
-        weapon.parent = this;
+        // weapon.parent = this;
         initialScale = rbTransform.localScale;
     }
 
@@ -186,11 +188,14 @@ Collider2D[] targets;
         uM = UM.Instance;
         // playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
         playerAllies = uM.allyArray;
-        playerAlliesT = FilterEnemiesByDistanceTransform(
-            uM.allyArrayTransform,
-            transform.position,
-            fireRange
-        );
+        playerAlliesT = uM.allyArrayTransform;
+            
+        
+        // playerAlliesT = FilterEnemiesByDistanceTransform(
+        //     uM.allyArrayTransform,
+        //     transform.position,
+        //     fireRange
+        // );
     }
 
 
@@ -337,7 +342,8 @@ Collider2D[] targets;
             return;
             fireRange = (150f + uM.allies);
         captains = uM.captains;
-        playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
+        playerAllies = uM.allyArray;
+        // playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
         playerPosition = playerC.position;
         closestPlayerObject = GetClosestGameObject(playerAllies, transform.position);
 
@@ -403,7 +409,8 @@ Collider2D[] targets;
         captains = uM.captains;
 
         playerPosition = playerC.position;
-        playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
+        playerAllies = uM.allyArray;
+        // playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
         closestPlayerObject = GetClosestGameObject(playerAllies, transform.position);
         if(this.gameObject.tag != "HammerHead" && this.gameObject.tag != "EnemyCaptain")
         if (captains.Length > 0 && !rallied)
@@ -550,7 +557,7 @@ void UpdateHHTarget()
             targetObject
                 .GetComponent<Rigidbody2D>()
                 .AddForce((rbTransform.position - targetObject.transform.position) * 500);
-            hp += .002f;
+            hp += .005f;
             rb.mass = 500 * hp;
 
             if(IsServer){
@@ -559,8 +566,11 @@ void UpdateHHTarget()
             
             }
         }
-        if(IsServer)
-        rbTransform.localScale = initialScale * hp;
+        if(IsServer){
+            if(hp > 1)
+            rbTransform.localScale = initialScale * hp;
+        }
+        
 
     }
     void FixedUpdate()
@@ -602,39 +612,11 @@ if(gameObject.tag == "HammerHead"){
             
         }
 
-        
-        if (!isCaptain && path != null)
-        {
-            if (path.vectorPath != null)
-            {
-                if (currentWaypoint >= path.vectorPath.Count)
-                {
-                    currentWaypoint = 0;
-                    return;
-                }
-                // if (path.vectorPath.Count > 2 && rallied)
-                // aIPath.canMove = true;
-                // else
-                // aIPath.canMove = false;
-                float nextDistance = Vector2.Distance(
-                    rb.position,
-                    path.vectorPath[currentWaypoint]
-                );
-                if (nextDistance < nextWaypointDistance)
-                {
-                    currentWaypoint++;
-                }
-                else
-                {
-                    reachedEndOfPath = false;
-                }
-            }
-        }
+
 
         if (hp != hpCheck)
         {
             hpCheck = hp;
-            // sprite.color = new Color(255, hp, 0);
         }
         GameObject closest = null;
         float distance = Mathf.Infinity;
@@ -721,7 +703,7 @@ if(gameObject.tag == "HammerHead"){
             VGPos.z = VGZ;
             if (magnitude > 80)
                 magnitude = 80;
-            uM.VG.AddGridForce(VGPos, magnitude * uM.VGForce, 1, color, true);
+            // uM.VG.AddGridForce(VGPos, magnitude * uM.VGForce, 1, color, true);
         }
     }
 }

@@ -8,21 +8,23 @@ public class Bullet : NetworkBehaviour
     private float expiration = 0;
     public GameObject prefab;
     private UM uM;
-    public bool boosted = false;
+    // public bool boosted = false;
     public Rigidbody2D rb;
     private Transform rbTransform;
     public int teamID = -1;
-
+// void OnNetworkSpawn(){
+// rbTransform = rb.transform;
+// }
     void Start()
     {
         rbTransform = rb.transform;
         uM = UM.Instance;
     }
 
-    void OnEnable()
-    {
-        boosted = false;
-    }
+    // void OnEnable()
+    // {
+    //     // boosted = false;
+    // }
 
     private void OnCollisionEnter2D(Collision2D col)
     {
@@ -42,9 +44,11 @@ public class Bullet : NetworkBehaviour
         //         despawnClientRpc();
         // NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
         // }
-    if (NetworkObject.IsSpawned){
-        uM.spawnSparkServerRpc(rbTransform.position, Quaternion.LookRotation(-rb.velocity.normalized));
+        
 
+    if (NetworkObject.IsSpawned && gameObject.tag != col.gameObject.tag){
+        // Debug.Log(rbTransform + " " + Quaternion.LookRotation(-rb.velocity.normalized));
+        uM.spawnSparkServerRpc(rbTransform.position, Quaternion.LookRotation(-rb.velocity.normalized));
 despawnServerRpc();
     }
         
@@ -73,11 +77,11 @@ despawnServerRpc();
     // }
     void FixedUpdate()
     {
-        if (!boosted)
-        {
-            // rb.AddForce(rb.transform.up * 2000);
-            boosted = true;
-        }
+        // if (!boosted)
+        // {
+        //     // rb.AddForce(rb.transform.up * 2000);
+        //     boosted = true;
+        // }
 
         if (rbTransform.position.z != -1)
         {
