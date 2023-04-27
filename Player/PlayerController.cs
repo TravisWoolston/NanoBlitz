@@ -83,7 +83,7 @@ public class PlayerController : NetworkBehaviour
     UM uM;
     float dodgeCD = 0;
     public float distanceThreshold = 0;
-    Collider2D[] targets;
+    public Collider2D[] targets;
     Vector3 initialScale;
     Collider2D[] colliders;
     public GameObject playerCam;
@@ -104,13 +104,18 @@ public class PlayerController : NetworkBehaviour
     public Dictionary<ulong, GameObject> allyDic = new Dictionary<ulong, GameObject>();
     public Dictionary<ulong, GameObject> enemyDic = new Dictionary<ulong, GameObject>();
     float boostMod = 100;
+    float consumedCounter = 0;
+    Quaternion targetRotation;
+    NetworkObject targetObject = null;
     void Awake()
     {
         uM = UM.Instance;
         rb.gravityScale = 1;
     }
     public override void OnNetworkSpawn(){
+        rbTransform = rb.transform;
         AssignPlayerColorServerRpc();
+        targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
     }
     [ServerRpc(RequireOwnership = false)]
     public void AssignPlayerColorServerRpc()
@@ -164,9 +169,9 @@ public class PlayerController : NetworkBehaviour
         playerCamC = playerCam.GetComponent<CamMovement>();
         playerCamC.player = rbTransform;
 
-        renderCam = GameObject.Find("Render Cam");
-        renderCamC = renderCam.GetComponent<CamMovement>();
-        renderCamC.player = rbTransform;
+        // renderCam = GameObject.Find("Render Cam");
+        // renderCamC = renderCam.GetComponent<CamMovement>();
+        // renderCamC.player = rbTransform;
 
         HPBar = HealthBar.Instance;
         ShieldMeter = ShieldBar.Instance;
@@ -317,8 +322,9 @@ public class PlayerController : NetworkBehaviour
         targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
         hpDrain.enabled = true;
         float healRate = .002f * maxHp;
-        NetworkObject targetObject = null;
+        
         float mostHp = -1;
+        
         foreach (Collider2D tgt in targets)
         {
             NetworkObject go = tgt.gameObject.GetComponent<NetworkObject>();
@@ -337,7 +343,7 @@ public class PlayerController : NetworkBehaviour
         {
             Transform targetObjT = targetObject.transform;
             targetObject.GetComponent<PlayerCopy>().hp -= healRate;
-            if (Vector2.Distance(rbTransform.position, targetObjT.position) > distanceThreshold /4)
+            // if (Vector2.Distance(rbTransform.position, targetObjT.position) > distanceThreshold /4)
                 targetObject
                     .GetComponent<Rigidbody2D>()
                     .AddForce((rbTransform.position - targetObjT.position) * 500);
@@ -363,8 +369,9 @@ public class PlayerController : NetworkBehaviour
         // );
         targets = Physics2D.OverlapCircleAll(rbTransform.position, distanceThreshold);
         hpDrain.enabled = true;
-        NetworkObject targetObject = null;
+        
         float mostHp = -1;
+        if(targetObject == null || !targetObject.IsSpawned)
         foreach (Collider2D tgt in targets)
         {
             NetworkObject go = tgt.gameObject.GetComponent<NetworkObject>();
@@ -381,20 +388,30 @@ public class PlayerController : NetworkBehaviour
 
         if (targetObject != null)
         {
-            targetObject.GetComponent<PlayerCopy>().hp -= 0.005f;
-            targetObject
-                .GetComponent<Rigidbody2D>()
-                .AddForce((rbTransform.position - targetObject.transform.position) * 500);
-            maxHp += .002f;
+            PlayerCopy targetAlly = targetObject.GetComponent<PlayerCopy>();
+            Vector3 tOPosition = targetObject.transform.position;
+            Rigidbody2D tORb = targetObject
+                .GetComponent<Rigidbody2D>();
+            targetAlly.hp -= 0.005f;
+            
+                consumedCounter += Time.deltaTime;
+                if(consumedCounter >= 5){
+                    uM.spawnAlphaServerRpc(tOPosition, targetRotation);
+                    consumedCounter = 0;
+                }
+            
+            tORb
+                .AddForce((rbTransform.position - tOPosition) * 500);
+            maxHp += .005f;
             rb.mass = 1000 * maxHp;
             HPBar.SetMaxHealth(maxHp);
             if(IsServer){
                 hpDrain.SetPosition(0, rbTransform.position);
-            hpDrain.SetPosition(1, targetObject.transform.position);
+            hpDrain.SetPosition(1, tOPosition);
             
             }
             else {
-                uM.UpgradeServerRpc(playerID.Value, rbTransform.position, targetObject.transform.position);
+                uM.UpgradeServerRpc(playerID.Value, rbTransform.position, tOPosition);
             }
         }
         // if(IsServer)
@@ -405,8 +422,9 @@ public class PlayerController : NetworkBehaviour
 
     private void FixedUpdate()
     {
+        
         magnitude = rb.velocity.magnitude;
-        distanceThreshold = (30);
+        // distanceThreshold = (30+ allyDic.Count/10);
         // distanceThreshold = (30 + maxHp);
         velocity = rb.velocity;
         mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
@@ -447,7 +465,7 @@ public class PlayerController : NetworkBehaviour
         Vector2 direction = mousePosition - rb.position;
         direction.Normalize();
         float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-        Quaternion targetRotation = Quaternion.Euler(Vector3.forward * (angle - offset));
+         targetRotation = Quaternion.Euler(Vector3.forward * (angle - offset));
 
         if (transform.rotation != targetRotation)
         {
@@ -471,19 +489,22 @@ public class PlayerController : NetworkBehaviour
         }
 
         float dot = Vector3.Dot(transform.up, direction.normalized);
-        if (Input.GetKey(KeyCode.F))
-        {
-            Upgrade();
-        }
-        else
-        {
+        // if (Input.GetKey(KeyCode.F))
+        // {
+            
+        // }
+        // else
+        // {
             if (hp < maxHp)
             {
                 recoverHP();
             }
+            else if(targets.Length > 0){
+                Upgrade();
+            }
             else
                 hpDrain.enabled = false;
-        }
+        // }
         if (timer > .3f && dot > .9)
         {
             if (Input.GetMouseButton(1) && missiles > 0)
@@ -504,72 +525,72 @@ public class PlayerController : NetworkBehaviour
         UM.Instance.playerArray[playerID.Value] = gameObject;
     }
 
-    void Update()
-    {
-        if (!IsOwner)
-            return;
-        if (playerCam == null)
-        {
-            if (IsOwner || IsServer)
-            {
-                playerCam = GameObject.Find("Main Camera");
-                playerCamC = playerCam.GetComponent<CamMovement>();
-                playerCamC.player = rbTransform;
-                renderCam = GameObject.Find("Render Camera");
-                renderCamC = renderCam.GetComponent<CamMovement>();
-                renderCamC.player = rbTransform;
-                playerMM = GameObject.Find("MiniMap");
-                playerMMC = playerMMC.GetComponent<CamMovement>();
-                playerMMC.player = rbTransform;
-            }
-        }
+    // void Update()
+    // {
+    //     if (!IsOwner)
+    //         return;
+    //     if (playerCam == null)
+    //     {
+    //         if (IsOwner || IsServer)
+    //         {
+    //             playerCam = GameObject.Find("Main Camera");
+    //             playerCamC = playerCam.GetComponent<CamMovement>();
+    //             playerCamC.player = rbTransform;
+    //             // renderCam = GameObject.Find("Render Camera");
+    //             // renderCamC = renderCam.GetComponent<CamMovement>();
+    //             // renderCamC.player = rbTransform;
+    //             playerMM = GameObject.Find("MiniMap");
+    //             playerMMC = playerMMC.GetComponent<CamMovement>();
+    //             playerMMC.player = rbTransform;
+    //         }
+    //     }
 
-        if (allies < uM.allies)
-        {
-            allies = uM.allies;
-            sHPMax = .5f + (allies / 15);
-            ShieldMeter.SetMaxHealth(sHPMax);
-        }
-        if (sTimer >= 5 && sHP < sHPMax)
-        {
-            sHP += sHPMax / 1000;
-            if (sHP > sHPMax)
-                sHP = sHPMax;
-            ShieldMeter.SetHealth(sHP);
-        }
-        sTimer += Time.deltaTime;
+    //     if (allies < uM.allies)
+    //     {
+    //         allies = uM.allies;
+    //         sHPMax = .5f + (allies / 15);
+    //         ShieldMeter.SetMaxHealth(sHPMax);
+    //     }
+    //     if (sTimer >= 5 && sHP < sHPMax)
+    //     {
+    //         sHP += sHPMax / 1000;
+    //         if (sHP > sHPMax)
+    //             sHP = sHPMax;
+    //         ShieldMeter.SetHealth(sHP);
+    //     }
+    //     sTimer += Time.deltaTime;
 
-        if (Input.GetMouseButton(0))
-        {
-            VGMouse = (Vector3)mousePosition;
-            VGMouse.z = VGZ;
-            LayerMask targetMask = 1;
-            uM.VG.AddGridForce(VGMouse, 3, 2, playerColor.Value, false);
-        }
+    //     if (Input.GetMouseButton(0))
+    //     {
+    //         VGMouse = (Vector3)mousePosition;
+    //         VGMouse.z = VGZ;
+    //         LayerMask targetMask = 1;
+    //         // uM.VG.AddGridForce(VGMouse, 3, 2, playerColor.Value, false);
+    //     }
 
-        VGPos = rb.position;
-        VGPos.z = uM.VGZ;
-        uM.VG.AddGridForce(VGPos, 5, hp * 1.2f, playerColor.Value, true);
+    //     VGPos = rb.position;
+    //     VGPos.z = uM.VGZ;
+    //     // uM.VG.AddGridForce(VGPos, 5, 4, playerColor.Value, true);
 
-        if (colliders != null)
-            foreach (Collider2D hit in colliders)
-            {
-                Rigidbody2D rb = hit.GetComponent<Rigidbody2D>();
-                if (rb != null)
-                {
-                    if (rb.tag != this.tag && rb.tag != "Bullet")
-                    {
-                        Transform colTransform = rb.transform;
-                        Vector3 colVec = new Vector3(
-                            colTransform.position.x,
-                            colTransform.position.y,
-                            VGShield.transform.position.z
-                        );
-                        VGShield.AddGridForce(colVec, 1f, .3f, Color.red, false);
-                    }
-                }
-            }
-    }
+    //     if (colliders != null)
+    //         foreach (Collider2D hit in colliders)
+    //         {
+    //             Rigidbody2D rb = hit.GetComponent<Rigidbody2D>();
+    //             if (rb != null)
+    //             {
+    //                 if (rb.tag != this.tag && rb.tag != "Bullet")
+    //                 {
+    //                     Transform colTransform = rb.transform;
+    //                     Vector3 colVec = new Vector3(
+    //                         colTransform.position.x,
+    //                         colTransform.position.y,
+    //                         VGShield.transform.position.z
+    //                     );
+    //                     // VGShield.AddGridForce(colVec, 1f, .3f, Color.red, false);
+    //                 }
+    //             }
+    //         }
+    // }
 
     void LateUpdate()
     {

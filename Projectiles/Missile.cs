@@ -28,6 +28,7 @@ public class Missile : NetworkBehaviour
     Vector2 moveDirection;
     public Vector2 target;
     public GameObject targetGameObject;
+    public NetworkObject targetNetObject;
     private float explosionRadius = 50f;
     private float explosionForce = 50f;
     private float timer = 0;
@@ -45,6 +46,7 @@ public class Missile : NetworkBehaviour
     private bool boosted = false;
     float thrustPower;
 public Dictionary<ulong, GameObject> enemyDic = new Dictionary<ulong, GameObject>();
+PlayerCopy lockedShip;
     //     public AudioSource explosionSFX;
     //     private AudioClip exp;
     // public AudioClip[] explosions;
@@ -57,6 +59,8 @@ public Dictionary<ulong, GameObject> enemyDic = new Dictionary<ulong, GameObject
             engineParticles.GetComponent<ParticleSystem>().startColor = Color.blue;
             // targetGameObject = uM.fireTarget;
             rippleColor = Color.blue;
+        } else {
+            enemyDic = uM.globalAllyDic;
         }
         rbTransform = transform;
         rb.angularDrag = 1;
@@ -134,7 +138,7 @@ public bool DicCheck(GameObject gameObjectToCheck)
         }
         else
         {
-            if (collision.gameObject.tag == "Clone" || collision.gameObject.tag == "Player")
+            if (DicCheck(collision.gameObject))
             {
                 Explode();
                 timer = 0;
@@ -161,14 +165,14 @@ public bool DicCheck(GameObject gameObjectToCheck)
                     float effect = (1 - (distance / explosionRadius)) * effectMod;
                     if (effect < 0)
                     {
-                        effect = 0;
+                        effect = 0.001f;
                     }
                     Vector2 force = direction.normalized * explosionForce * effect;
 
                     if (hit.tag == "BasicEnemy" || hit.tag == "HammerHead")
                     {
                         contact = true;
-                        rb.gameObject.GetComponent<EnemyBasic>().hp -= effect * .4f;
+                        rb.gameObject.GetComponent<EnemyBasic>().hp -= effect;
                         // rb.AddForce(force, ForceMode2D.Impulse);
                         rb.AddForce(force * rb.mass * 50);
                     }
@@ -203,6 +207,7 @@ public bool DicCheck(GameObject gameObjectToCheck)
                     Vector2 direction = rb.transform.position - transform.position;
                     float distance = direction.magnitude;
                     float effect = 1 - (distance / explosionRadius);
+                    if(effect < 0) effect = .001f;
                     Vector2 force = direction.normalized * explosionForce * effect;
 
                     if (rb.tag == "Clone")
@@ -245,7 +250,7 @@ public bool DicCheck(GameObject gameObjectToCheck)
         uM.Explosion(transform);
         uM.spawnExplosionServerRpc(rbTransform.position, rbTransform.rotation);
         // uM.despawn(prefab);
-
+        lockedShip = null;
         if (!IsServer)
             return;
         boosted = false;
@@ -298,6 +303,7 @@ if (NetworkObject.IsSpawned)
             rb.AddForce(Accelerator() * thrustPower * 10);
             boosted = true;
         }
+        
         if (rbTransform.position.z != -1)
         {
             rbTransform.position = new Vector3(rbTransform.position.x, rbTransform.position.y, -1);
@@ -352,9 +358,17 @@ if (NetworkObject.IsSpawned)
             //     predictedTarget = uM.position;
             // }
             // else
-            if (timer > 3)
+            if ((gameObject.tag == "EnemyMPF" && targetGameObject == null) || !targetNetObject.IsSpawned)
             {
-                predictedTarget = uM.allyArray[0].transform.position;
+                targetGameObject = uM.GetClosestEnemyGameObjectDic(uM.globalAllyDic, transform.position);
+                targetNetObject = targetGameObject.GetComponent<NetworkObject>();
+                if (targetGameObject.tag == "Alpha"){
+                    lockedShip = targetGameObject.GetComponent<PlayerCopy>();
+                    lockedShip.lockedOnto = true;
+                    lockedShip.missileRef = gameObject;
+                }
+                target = targetGameObject.transform.position;
+                predictedTarget = target;
             }
             else
                 predictedTarget = target;

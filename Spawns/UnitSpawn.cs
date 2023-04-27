@@ -31,7 +31,7 @@ public class UnitSpawn : NetworkBehaviour
         uM = UM.Instance;
                             if (this.gameObject.tag == "EnemyCptSpawn")
         {
-            spawn = 50;
+            spawn = 120;
         }
         else if (this.gameObject.tag == "EnemyHHSpawn"){
             spawn = 30;
@@ -58,7 +58,7 @@ void spawnUnit(GameObject unitPrefab) {
         if(!unitToSpawn.IsSpawned) unitToSpawn.Spawn(true);
 }
 
-    void Update()
+    void FixedUpdate()
     {
         if(!NetworkManager.Singleton.IsServer) return;
         if (UM.Instance.playerArray.Length == 0) {
@@ -79,7 +79,7 @@ void spawnUnit(GameObject unitPrefab) {
             else
             {
                 uM.spawnEnemyBasicServerRpc(transform.position, transform.rotation);
-                spawn = 2;
+                spawn = 5;
             }
 
             spawnTimer = 0;

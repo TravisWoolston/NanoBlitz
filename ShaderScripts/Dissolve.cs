@@ -44,7 +44,7 @@ public class Dissolve : MonoBehaviour
         if (isDissolving)
         {
             fade -= Time.deltaTime;
-
+            material.SetFloat("_Fade", fade);
             if (fade <= 0f)
             {
                 fade = 0f;
@@ -58,18 +58,19 @@ public class Dissolve : MonoBehaviour
         if (isForming)
         {
             fade += Time.deltaTime;
+            material.SetFloat("_Fade", fade);
             if (fade >= 1)
             {
-                fade = 1;
+                fade = .99f;
                 isForming = false;
             }
         
         }
         if(charging){
             colorIntensity += Time.deltaTime;
-            
+            material.SetFloat("_ColorIntensity", colorIntensity);
         }
-        material.SetFloat("_ColorIntensity", colorIntensity);
-         material.SetFloat("_Fade", fade);
+        
+         
     }
 }

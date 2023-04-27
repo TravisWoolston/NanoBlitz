@@ -30,6 +30,7 @@ public class UM : NetworkBehaviour
     public GameObject enemyHHPrefab;
     public GameObject sparkPrefab;
     public GameObject explosionPrefab;
+    public GameObject alphaPrefab;
     public bool updateNeeded = false;
     private float delayTime = .7f;
     public float VGForce = .03f;
@@ -57,6 +58,7 @@ public class UM : NetworkBehaviour
     public string gameMode = "PVP";
     public float sparkTimer = 0;
     public List<NetworkObject> activeSparks = new List<NetworkObject>();
+    public Dictionary<ulong, GameObject> globalAllyDic = new Dictionary<ulong, GameObject>();
     void Awake()
     {
          {
@@ -96,22 +98,30 @@ public class UM : NetworkBehaviour
     }
     }
 public void UpdateTeams(PlayerController playerC, GameObject go){
+    globalAllyDic.Add(go.GetComponent<NetworkObject>().NetworkObjectId, go);
     for(int i = 0; i < playerArray.Length; i++){
+        PlayerController player = playerArray[i].GetComponent<PlayerController>();
         if(i != playerC.playerID.Value){
-            playerArray[i].GetComponent<PlayerController>().enemyDic.Add(go.GetComponent<NetworkObject>().NetworkObjectId, go);
+            player.enemyDic.Add(go.GetComponent<NetworkObject>().NetworkObjectId, go);
+            
         }
         else {
-            playerArray[i].GetComponent<PlayerController>().allyDic.Add(go.GetComponent<NetworkObject>().NetworkObjectId, go);
+            player.allyDic.Add(go.GetComponent<NetworkObject>().NetworkObjectId, go);
+            player.distanceThreshold = 30 + player.allyDic.Count/10;
         }
     }
 }
 public void RemoveUpdateTeams(PlayerController playerC, GameObject go){
+    globalAllyDic.Remove(go.GetComponent<NetworkObject>().NetworkObjectId);
     for(int i = 0; i < playerArray.Length; i++){
+        PlayerController player = playerArray[i].GetComponent<PlayerController>();
         if(i != playerC.playerID.Value){
+            
             playerArray[i].GetComponent<PlayerController>().enemyDic.Remove(go.GetComponent<NetworkObject>().NetworkObjectId);
         }
         else {
             playerArray[i].GetComponent<PlayerController>().allyDic.Remove(go.GetComponent<NetworkObject>().NetworkObjectId);
+        player.distanceThreshold = 30 + player.allyDic.Count/10;
         }
     }
 }
@@ -256,7 +266,21 @@ public void RemoveUpdateTeams(PlayerController playerC, GameObject go){
         if (!unitToSpawn.IsSpawned)
             unitToSpawn.Spawn(true);
     }
+[ServerRpc]
+    public void spawnAlphaServerRpc(Vector3 objVector, Quaternion objQuat)
+    {
+        if (!NetworkManager.Singleton.IsServer)
+            return;
+        NetworkObject unitToSpawn = NetworkObjectPool.Singleton.GetNetworkObject(
+            alphaPrefab,
+            objVector,
+            objQuat
+        );
 
+        unitToSpawn.GetComponent<PlayerCopy>().prefab = alphaPrefab;
+        if (!unitToSpawn.IsSpawned)
+            unitToSpawn.Spawn(true);
+    }
     [ServerRpc(RequireOwnership = false)]
     public void spawnMissileServerRpc(
         Vector3 objVector,

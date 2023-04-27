@@ -68,7 +68,7 @@ Collider2D[] targets;
     int currentWaypoint = 0;
     // bool reachedEndOfPath = false;
     // Seeker seeker;
-
+    public float targetDirectionDot;
     public Vector2 goTo;
     private GridGraph gridGraph;
     public GameObject engineParticles;
@@ -95,6 +95,7 @@ Collider2D[] targets;
     public float enemyID = 0;
     Vector3 initialScale;
       public LineRenderer hpDrain;
+      public bool absorbed = false;
     void Awake(){
         uM = UM.Instance;
     }
@@ -106,6 +107,9 @@ Collider2D[] targets;
         // rallied = false;
         if(this.gameObject.tag == "HammerHead"){
             hp = 5;
+        }
+        if(this.gameObject.tag == "BasicEnemy"){
+            hp = 1;
         }
        }
        public override void OnNetworkDespawn(){
@@ -120,9 +124,10 @@ Collider2D[] targets;
         // playerC = player.GetComponent<PlayerController>();
         VGZ = uM.VGZ;
         playerAllies = uM.allyArray;
-
+        
         if (this.gameObject.tag == "EnemyCaptain")
-        {
+        {   
+            
             VGRadius = 5;
             rb.angularDrag = 1000;
             dmgRate = .01f;
@@ -132,7 +137,7 @@ Collider2D[] targets;
             isCaptain = true;
             fireRate = 2;
             rotationSpeed = .5f;
-
+            hp = 3;
             InvokeRepeating("UpdateCaptainTarget", .1f, .5f);
             fireRange = 100;
         }
@@ -161,7 +166,7 @@ Collider2D[] targets;
         thrustPower = rb.mass * 10;
         rbTransform = rb.transform;
         sprite = this.GetComponent<SpriteRenderer>();
-        sprite.color = new Color(1, 0, 0);
+        // sprite.color = new Color(1, 0, 0);
         color = sprite.color;
         // weapon.parent = this;
         initialScale = rbTransform.localScale;
@@ -208,7 +213,7 @@ Collider2D[] targets;
         }
         if (collision.gameObject.tag == "Bullet")
         {
-            hp -= dmgRate;
+            hp -= .01f;
         }
     }
 
@@ -257,7 +262,8 @@ Collider2D[] targets;
         }
         else
         {
-            uM.spawnCloneServerRpc( transform.position, transform.rotation);
+            if(!absorbed)
+            uM.spawnCloneServerRpc(transform.position, transform.rotation);
         }
 
         despawnServerRpc();
@@ -487,8 +493,10 @@ void UpdateHHTarget()
         captains = uM.captains;
 
         playerPosition = playerC.position;
-        playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
-        closestPlayerObject = GetClosestGameObject(playerAllies, transform.position);
+        // playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
+        closestPlayerObject = GetClosestGameObject(uM.allyArray, transform.position);
+        // playerAllies = FilterEnemiesByDistance(uM.allyArray, transform.position, fireRange);
+        // closestPlayerObject = GetClosestGameObject(playerAllies, transform.position);
 
         {
             if (closestPlayerObject == null)
@@ -553,7 +561,9 @@ void UpdateHHTarget()
 
         if (targetObject != null)
         {
-            targetObject.GetComponent<EnemyBasic>().hp -= 0.005f;
+            EnemyBasic enemyBasic = targetObject.GetComponent<EnemyBasic>();
+            enemyBasic.hp -= 0.005f;
+            enemyBasic.absorbed = true;
             targetObject
                 .GetComponent<Rigidbody2D>()
                 .AddForce((rbTransform.position - targetObject.transform.position) * 500);
@@ -566,17 +576,18 @@ void UpdateHHTarget()
             
             }
         }
-        if(IsServer){
-            if(hp > 1)
-            rbTransform.localScale = initialScale * hp;
-        }
+        // if(IsServer){
+            // if(hp > 1)
+            // rbTransform.localScale = initialScale * hp;
+        // }
         
 
     }
     void FixedUpdate()
     {
 if(!NetworkManager.Singleton.IsServer) return;
-if(gameObject.tag == "EnemyCaptain"){
+
+if(gameObject.tag == "EnemyCaptain" & hp < 8){
     Upgrade();
 }
 if(gameObject.tag == "HammerHead"){
@@ -605,6 +616,7 @@ if(gameObject.tag == "HammerHead"){
         if (Dissolve.dissolveDone)
         {
             Despawn();
+            return;
         }
         if (hp < 0)
         {
@@ -635,15 +647,20 @@ if(gameObject.tag == "HammerHead"){
         Quaternion targetRotation;
         if (
             Vector2.Distance(rb.position, target) > distanceThreshold
-            && Vector2.Distance(rb.position, fireTarget) > fireRange
+           
         )
         {
+            targetDirectionDot = Vector3.Dot(transform.up, targetDirection);
+            if(targetDirectionDot > .9){
+                rb.AddForce(Accelerator(rbTransform.up) * (thrustPower));
+            }
             targetRotation = Quaternion.Euler(Vector3.forward * (targetAngle - offset));
         }
         else
         {
             targetRotation = Quaternion.Euler(Vector3.forward * (fireAngle - offset));
         }
+
 
         if (transform.rotation != targetRotation)
         {

@@ -46,7 +46,7 @@ public class NetworkManagerUI : NetworkBehaviour
         {
             JoinRelay();
         });
-        if(hostType == "LocalHost"){
+        if(hostType == "LocalHost" || hostType == null){
             LocalHost();
         }
                 localHostBtn.onClick.AddListener(() =>
@@ -60,6 +60,12 @@ public class NetworkManagerUI : NetworkBehaviour
         Debug.Log("Host type: " + MainMenu.HostType);
         
     }
+//     void Start(){
+// if(hostType == null) {
+//     MainMenu.HostType = "LocalHost";
+//     SceneManager.LoadScene("NB multiplayer");
+//     }
+//     }
     public void StartServer(){
             NetworkManager.Singleton.StartServer();
         }

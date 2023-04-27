@@ -46,7 +46,7 @@ public class Bullet : NetworkBehaviour
         // }
         
 
-    if (NetworkObject.IsSpawned && gameObject.tag != col.gameObject.tag){
+    if (NetworkObject.IsSpawned && gameObject.tag != col.gameObject.tag && rbTransform){
         // Debug.Log(rbTransform + " " + Quaternion.LookRotation(-rb.velocity.normalized));
         uM.spawnSparkServerRpc(rbTransform.position, Quaternion.LookRotation(-rb.velocity.normalized));
 despawnServerRpc();

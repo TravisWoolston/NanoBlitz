@@ -22,6 +22,7 @@ public class PlayerCopy : NetworkBehaviour
     Vector2 mousePosition;
 
     private float timer = 0.0f;
+    private float fireRate = 0.3f;
     public float hp = 1;
     public float hpCheck;
     public float allies;
@@ -35,7 +36,7 @@ public class PlayerCopy : NetworkBehaviour
 
     float curDistance = 0;
     public GameObject closestBasicEnemy;
-    float distanceThreshold;
+    public float distanceThreshold;
     float fireThreshold;
     public GameObject engineParticles;
     GameObject engine;
@@ -68,6 +69,8 @@ public class PlayerCopy : NetworkBehaviour
     public GameObject prefab;
     public Transform firePoint;
     public bool reclaimed = false;
+    public bool lockedOnto = false;
+    public GameObject missileRef;
 
     void Awake()
     {
@@ -91,7 +94,7 @@ public class PlayerCopy : NetworkBehaviour
     }
     void Start()
     {
-        uM = UM.Instance;
+        // uM = UM.Instance;
         // activeShield = true;
         // player = GameObject.FindGameObjectsWithTag("Player")[0];
         // playerT = player.transform;
@@ -101,7 +104,7 @@ public class PlayerCopy : NetworkBehaviour
         allies = uM.allies;
         enemies = uM.enemies;
         sprite = this.GetComponent<SpriteRenderer>();
-        sprite.color = new Color(1 - hp, 1 - hp, 1 - hp);
+        // sprite.color = new Color(1 - hp, 1 - hp, 1 - hp);
         color = Color.blue;
         cloneNumber = uM.allies;
         rb.angularDrag = 10;
@@ -112,7 +115,10 @@ public class PlayerCopy : NetworkBehaviour
         // engine = Instantiate(engineParticles, exhaustPoint);
         InvokeRepeating("UpdateTarget", 0f, .2f);
         rbTransform = rb.transform;
-
+        if(gameObject.tag == "Alpha"){
+            fireRate = .1f;
+            rb.mass = 300;
+        }
         // bulletAudio = GetComponent<AudioSource>();
     }
 
@@ -129,7 +135,7 @@ public class PlayerCopy : NetworkBehaviour
     {
         if (collision.gameObject.tag == "EnemyBullet" && !activeShield)
         {
-            hp -= .0314f;
+            hp -= .01f;
         }
         if (collision.gameObject.tag == "HammerHead" && !activeShield)
         {
@@ -137,7 +143,7 @@ public class PlayerCopy : NetworkBehaviour
         }
         if(collision.gameObject.tag == "Bullet" ){
             if(collision.gameObject.GetComponent<Bullet>().teamID != playerC.playerID.Value){
-                hp -= .0314f;
+                hp -= .01f;
             }
         }
     }
@@ -233,10 +239,8 @@ public class PlayerCopy : NetworkBehaviour
         NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
         despawnClientRpc();
     }
-
-    void FixedUpdate()
-    {
-        VGShieldTimer += Time.deltaTime;
+    void CloneFixedUpdate(){
+         VGShieldTimer += Time.deltaTime;
         if (VGShieldTimer > 3 && activeShield)
         {
             VGShield.GetComponent<MeshRenderer>().enabled = false;
@@ -284,8 +288,8 @@ public class PlayerCopy : NetworkBehaviour
             // Dissolve.fade = hp;
             // sprite.color = new Color(1 - hp, 1 - hp, 1 - hp);
         }
-        if (rallied)
-            sprite.color = Color.blue;
+        // if (rallied)
+        //     sprite.color = Color.blue;
         timer += Time.deltaTime;
 
         distance = Vector2.Distance(rbTransform.position, target);
@@ -352,7 +356,7 @@ public class PlayerCopy : NetworkBehaviour
 
         float dot = Vector3.Dot(transform.up, fireDirection.normalized);
 
-        if (timer > .3f && dot > .9 && enemies.Length > 0)
+        if (timer > fireRate && dot > .9 && enemies.Length > 0)
         {
             // bulletAudio.loop = true;
             int index = Random.Range(0, lasers.Length);
@@ -363,21 +367,170 @@ public class PlayerCopy : NetworkBehaviour
             uM.spawnBulletServerRpc(firePoint.position, firePoint.rotation, playerC.playerID.Value);
         }
     }
+    void AlphaMovement(){
 
-    void Update()
-    {
-        if (!IsServer)
-            return;
-        if (
-            magnitude > 30
-            && Vector2.Distance(playerT.position, rbTransform.position) > distanceThreshold
-        )
+             distance = Vector2.Distance(rbTransform.position, target);
+        Vector2 targetDirection = target - rb.position;
+        targetDirection.Normalize();
+        float targetAngle = Mathf.Atan2(targetDirection.y, targetDirection.x) * Mathf.Rad2Deg;
+        if (rb.velocity.magnitude == 0)
         {
-            VGPos = rb.position;
-            VGPos.z = VGZ;
-            // uM.VG.AddGridForce(VGPos, 0, 3, color, true);
+            time = distance / 0.01f;
         }
+        else
+            distance = Vector2.Distance(rbTransform.position, fireTarget);
+        if (enemies != null)
+            if (playerC.firing)
+            {
+                predictedTarget = playerC.VGMouse;
+            }
+            else
+            {
+                time = distance / 80;
+                if (closestBasicEnemy != null)
+                    predictedTarget =
+                        fireTarget + closestBasicEnemy.GetComponent<Rigidbody2D>().velocity * time;
+            }
+
+        Vector2 fireDirection = predictedTarget - rb.position;
+        fireDirection.Normalize();
+        float fireAngle = Mathf.Atan2(fireDirection.y, fireDirection.x) * Mathf.Rad2Deg;
+        // Quaternion targetRotation;
+        if(missileRef == null) lockedOnto = false;
+        else
+        if(missileRef.GetComponent<NetworkObject>().IsSpawned){
+            targetRotation = missileRef.transform.rotation;
+            rb.AddForce(Accelerator(rbTransform.up) * (thrustPower));
+             transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 50f);
+        }
+        else{
+        if (Vector2.Distance(rb.position, target) > distanceThreshold)
+        {
+            if (Vector2.Distance(playerT.position, transform.position) > distanceThreshold * .9)
+            {
+                rb.AddForce(Accelerator(rbTransform.up) * (thrustPower / 10));
+            }
+            targetRotation = Quaternion.Euler(Vector3.forward * (targetAngle - offset));
+        }
+        else
+        {
+            targetRotation = Quaternion.Euler(Vector3.forward * (fireAngle - offset));
+        }
+        if (transform.rotation != targetRotation)
+        {
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 2f);
+        }
+        else
+        {
+            if (Vector2.Distance(rb.position, target) > distanceThreshold)
+            {
+                if (Vector2.Distance(playerT.position, transform.position) > distanceThreshold * .9)
+                {
+                    rb.AddForce(Accelerator(rbTransform.up) * (thrustPower / 10));
+                }
+            }
+            else
+            {
+                if (accTimer > 0)
+                {
+                    accTimer -= Time.deltaTime;
+                }
+            }
+        }
+        if (Vector2.Distance(playerT.position, rbTransform.position) < distanceThreshold + 5)
+        {
+            if (rb.velocity.magnitude < playerC.velocity.magnitude)
+                rb.velocity = (Vector2)playerC.velocity;
+        }
+        }
+              float dot = Vector3.Dot(transform.up, fireDirection.normalized);
+
+        if (timer > fireRate && dot > .9 && enemies.Length > 0)
+        {
+            // bulletAudio.loop = true;
+            int index = Random.Range(0, lasers.Length);
+            bulletAudio.clip = lasers[index];
+            bulletAudio.pitch = Random.Range(.9f, 1.1f);
+            bulletAudio.Play();
+            timer = 0;
+            uM.spawnBulletServerRpc(firePoint.position, firePoint.rotation, playerC.playerID.Value);
+        }
+
     }
+    void AlphaFixedUpdate(){
+         VGShieldTimer += Time.deltaTime;
+        if (VGShieldTimer > 3 && activeShield)
+        {
+            VGShield.GetComponent<MeshRenderer>().enabled = false;
+            activeShield = false;
+        }
+        else if (!VGShield && activeShield)
+        {
+            VGShield.GetComponent<MeshRenderer>().enabled = true;
+        }
+        // if (!NetworkManager.Singleton.IsServer)
+        //     return;
+        if (player == null && uM.playerArray.Length > 0 && reclaimed)
+        {
+            player = uM.GetClosestPlayerGameObject(gameObject.transform.position);
+            playerT = player.transform;
+            playerC = player.GetComponent<PlayerController>();
+            allies = playerC.allies;
+        }
+        if (player == null)
+            return;
+        magnitude = rb.velocity.magnitude;
+        if (Dissolve.dissolveDone)
+        {
+            StartCoroutine(DelayedDisable());
+
+            despawnServerRpc();
+            // despawnClientRpc();
+            // NetworkObjectPool.Singleton.ReturnNetworkObject(NetworkObject, prefab);
+        }
+
+        if (hp <= 0)
+        {
+            Dissolve.isDissolving = true;
+        }
+        if (hp != hpCheck)
+        {
+            hpCheck = hp;
+            // Dissolve.fade = hp;
+            // sprite.color = new Color(1 - hp, 1 - hp, 1 - hp);
+        }
+        // if (rallied)
+            // sprite.color = Color.blue;
+        timer += Time.deltaTime;
+
+   
+        AlphaMovement();
+  
+    }
+    void FixedUpdate()
+    {
+        // if(gameObject.tag == "Clone")
+        CloneFixedUpdate();
+        // else
+        // AlphaFixedUpdate();
+
+       
+    }
+
+    // void Update()
+    // {
+    //     if (!IsServer)
+    //         return;
+    //     if (
+    //         magnitude > 30
+    //         && Vector2.Distance(playerT.position, rbTransform.position) > distanceThreshold
+    //     )
+    //     {
+    //         VGPos = rb.position;
+    //         VGPos.z = VGZ;
+    //         uM.VG.AddGridForce(VGPos, 0, 3, color, true);
+    //     }
+    // }
 
     void LateUpdate()
     {
